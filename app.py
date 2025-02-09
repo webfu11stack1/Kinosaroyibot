@@ -13,7 +13,7 @@ from aiogram.types import InputTextMessageContent
 from telegram import CallbackQuery, InlineQueryResultArticle
 
 
-conn = sqlite3.connect('moviebot.db')
+conn = sqlite3.connect('kinosaroy1bot.db')
 cursor = conn.cursor()
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS userid (
@@ -26,7 +26,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS userid_today (id INTEGER PRIMARY KE
 cursor.execute('''CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY, admin_id INTEGER , admin_name TEXT)''')
 
 def init_db():
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     # Create the movies table with necessary columns
@@ -48,7 +48,7 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS saved_movies (id INTEGER PRIMARY KE
 import sqlite3
 
 # Connect to the database
-with sqlite3.connect('moviebot.db') as conn:
+with sqlite3.connect('kinosaroy1bot.db') as conn:
     cursor = conn.cursor()
 
     # Check if the download_count column exists
@@ -74,7 +74,7 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 async def search_data(query):
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     # Qidiruvni bajarish
@@ -116,7 +116,7 @@ async def search_data(query):
 
 # Add movie to database
 def add_movie_to_db(name, description, video_file_id, movie_code, download_count=0):
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO movies (name, description, video_file_id, movie_code, download_count)
@@ -127,7 +127,7 @@ def add_movie_to_db(name, description, video_file_id, movie_code, download_count
 
 # Fetch movies from database
 def fetch_movies(query=None):
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     if query:
@@ -152,14 +152,13 @@ async def panel(message: types.Message, state: FSMContext):
 @dp.message_handler(commands=["panel"], state="*")
 async def panel(message: types.Message, state: FSMContext):
     mes_id = message.from_user.id
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     cursor.execute("SELECT admin_id FROM admins")
     admin_user_ids = cursor.fetchall()  # Fetch all admin IDs
 
     admin_user_ids = [admin[0] for admin in admin_user_ids]  # Extract IDs from tuples
-
     try:
         if mes_id in admin_user_ids or mes_id == 1996936737:
             panel = ReplyKeyboardMarkup(
@@ -328,13 +327,14 @@ async def dkin(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda d: d.data == "yes", state="kodo")
 async def yesdel(calmes: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    dk = data.get("dk")  # Retrieve dk from the state
+    dk = data.get("dk")  # Retrieve dk (movie_code) from the state
     
     if dk and dk.isdigit():
-        conn = sqlite3.connect("moviebot.db")
+        conn = sqlite3.connect("kinosaroy1bot.db")
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM data WHERE code = ?", (dk,))
+        # Delete the movie record from the 'movies' table using the movie_code (dk)
+        cursor.execute("DELETE FROM movies WHERE movie_code = ?", (dk,))
         conn.commit()
         conn.close()
 
@@ -344,6 +344,7 @@ async def yesdel(calmes: types.CallbackQuery, state: FSMContext):
         await calmes.answer("Raqam kiriting!", show_alert=True)
 
     await state.finish()
+
 
 
 
@@ -572,7 +573,7 @@ async def admin_ism(message: types.Message, state: FSMContext):
 async def qoshish(query: types.CallbackQuery, state: FSMContext):
    
 
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
 
@@ -635,7 +636,7 @@ async def admin_ismm(message: types.Message, state: FSMContext):
 async def ocir(query: types.CallbackQuery, state: FSMContext):
    
 
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
 
@@ -655,14 +656,14 @@ async def ocir(query: types.CallbackQuery, state: FSMContext):
 #Adminlar
 @dp.message_handler(text="👤Adminlar", state="*")
 async def admins_list(message: types.Message, state: FSMContext):
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY, admin_id INTEGER , admin_name TEXT)''')
 
     cursor.execute('SELECT  admin_id, admin_name FROM admins')
     admins_data = cursor.fetchall()
-    response = "<b>Adminlar</b> \n"
+    response = "Adminlar \n"
 
     if not admins_data:
         await message.reply("Adminlar ro'yxati bo'sh.")
@@ -670,9 +671,11 @@ async def admins_list(message: types.Message, state: FSMContext):
     else:
         for admin_data in admins_data:
             admin_id, admin_name = admin_data[0], admin_data[1]
-            response += f"<b>ID</b> : {admin_id} \n<b>Ism </b>: {admin_name} \n"
+            response += f"ID: {admin_id} \nIsm: {admin_name} \nProfil: tg://user?id={admin_id}\n"
 
-        await message.reply(response,parse_mode="HTML")
+        await message.reply(response, parse_mode="Markdown")
+
+
         await state.finish()
 
     conn.close()
@@ -691,7 +694,7 @@ from datetime import datetime as dt
 #Statistika
 @dp.message_handler(text="📊Statistika", state="*")
 async def statistika(message: types.Message, state: FSMContext):
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     cursor.execute("SELECT COUNT(DISTINCT user_id) FROM userid")
@@ -754,7 +757,7 @@ async def kanal_url(message:types.Message,state:FSMContext):
     global kanal_urll;
     kanal_urll = message.text
     if  kanal_urll.startswith("https:"):
-        conn = sqlite3.connect('moviebot.db')
+        conn = sqlite3.connect('kinosaroy1bot.db')
         cursor = conn.cursor()
     
         cursor.execute("INSERT INTO channel (channel_id, channel_url) VALUES (?, ?)", (kanal_idd, kanal_urll))
@@ -777,7 +780,7 @@ async def boshpanel(message:types.Message,state:FSMContext):
 
 @dp.message_handler(text="📢Kanallar",state="*")
 async def kanallar(message:types.Message,state:FSMContext):
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     cursor.execute("SELECT channel_url FROM channel")
@@ -835,7 +838,7 @@ async def kanal_urldel(message:types.Message,state:FSMContext):
     global kanal_urlldel;
     kanal_urlldel = message.text
     if  kanal_urlldel.startswith("https:"):
-        conn = sqlite3.connect('moviebot.db')
+        conn = sqlite3.connect('kinosaroy1bot.db')
         cursor = conn.cursor()
         try:
             cursor.execute("DELETE FROM channel WHERE channel_id=? AND channel_url=?", (kanal_iddel,kanal_urlldel))
@@ -1146,7 +1149,7 @@ async def export_users_command(message: types.Message, state: FSMContext):
 @dp.message_handler(text='📑Baza', state="*")
 async def export_db_command(message: types.Message, state: FSMContext):
     # Bazaning asl faylini nusxalash
-    db_file_path = 'moviebot.db'  # Bazangizning yo'li
+    db_file_path = 'kinosaroy1bot.db'  # Bazangizning yo'li
     backup_db_path = 'database_backup.db'  # Nusxasi saqlanadigan fayl nomi
 
     # Faylni nusxalash
@@ -1170,7 +1173,7 @@ async def start(message: types.Message, state: FSMContext):
     movie_name=None
 
     # Bazaga ulanish va foydalanuvchini tekshirish
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Foydalanuvchi bazada bormi yoki yo'qmi tekshirish
@@ -1240,7 +1243,7 @@ async def start(message: types.Message, state: FSMContext):
 
         # Yuklashlar sonini yangilash (bazaga)
         new_download_count = download_count + 1
-        with sqlite3.connect('moviebot.db') as conn:
+        with sqlite3.connect('kinosaroy1bot.db') as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE movies SET download_count = ? WHERE movie_code = ?",
@@ -1267,7 +1270,7 @@ async def start(message: types.Message, state: FSMContext):
                     
                 ],
                 [
-                    InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat="")
+                    InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")
                 ]
             ],
             row_width=2
@@ -1287,11 +1290,14 @@ async def start(message: types.Message, state: FSMContext):
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
                 [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
-                [InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat=""),
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )],
+                    ),
+                    InlineKeyboardButton(
+                        text="🎲Random", callback_data="random")
+                        ],
                 [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
             ],row_width=2
         )
@@ -1301,6 +1307,163 @@ async def start(message: types.Message, state: FSMContext):
             parse_mode="MARKDOWN",
             reply_markup=kanalim
         )
+
+@dp.callback_query_handler(lambda c: c.data == "random")
+async def send_random_movie(callback_query: types.CallbackQuery):
+    # Establish database connection and create cursor
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
+        cursor = conn.cursor()
+
+        # Select a random movie from the database
+        cursor.execute("SELECT name, description, video_file_id, movie_code, download_count FROM movies ORDER BY RANDOM() LIMIT 1")
+        movie = cursor.fetchone()
+
+        if movie:
+            name, description, video_file_id, movie_code, download_count = movie
+
+            # Increment the download count
+            new_download_count = download_count + 1
+            cursor.execute(
+                "UPDATE movies SET download_count = ? WHERE movie_code = ?",
+                (new_download_count, movie_code)
+            )
+            conn.commit()
+
+            # Inline button markup
+            inline = InlineKeyboardMarkup(
+                inline_keyboard=[ 
+                    [
+                        InlineKeyboardButton(
+                            text="Do'stlarga yuborish",
+                            switch_inline_query=f"{movie_code}"  # movie_code ni yuborish
+                        ),
+                        InlineKeyboardButton(
+                            text="📥 Saqlash", callback_data=f"save_movie:{movie_code}"  # Callbackda movie_codeni berish
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🛒 Saqlanganlar", callback_data="kor_kino"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+                        InlineKeyboardButton(text="Keyingisi⏩", callback_data="rand2")
+                    ]
+                ],
+                row_width=2
+            )
+
+            # Delete the previous message before sending the new one
+            await bot.delete_message(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id
+            )
+
+            # Send the video with updated download count
+            if video_file_id:
+                await bot.send_video(
+                    chat_id=callback_query.from_user.id,
+                    caption=f"🎬 **{name}**\n\n📖 {description}\n👁️: <b>{new_download_count}</b>",
+                    video=video_file_id,
+                    reply_markup=inline,
+                    parse_mode="HTML"
+                )
+            else:
+                await bot.send_message(
+                    chat_id=callback_query.from_user.id,
+                    text=f"🎬 **{name}**\n\n📖 {description}\n👁️: <b>{new_download_count}</b>",
+                    reply_markup=inline,
+                    parse_mode="HTML"
+                )
+        else:
+            await bot.send_message(
+                chat_id=callback_query.from_user.id,
+                text="Hozircha kinolar bazada yo'q."
+            )
+
+    # Acknowledge callback query
+    await callback_query.answer()
+
+
+
+@dp.callback_query_handler(lambda c: c.data == "rand2")
+async def send_random_movie(callback_query: types.CallbackQuery):
+    # Establish database connection and create cursor
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
+        cursor = conn.cursor()
+
+        # Select a random movie from the database
+        cursor.execute("SELECT name, description, video_file_id, movie_code, download_count FROM movies ORDER BY RANDOM() LIMIT 1")
+        movie = cursor.fetchone()
+
+        if movie:
+            name, description, video_file_id, movie_code, download_count = movie
+
+            # Increment the download count
+            new_download_count = download_count + 1
+            cursor.execute(
+                "UPDATE movies SET download_count = ? WHERE movie_code = ?",
+                (new_download_count, movie_code)
+            )
+            conn.commit()
+
+            # Inline button markup
+            inline = InlineKeyboardMarkup(
+                inline_keyboard=[ 
+                    [
+                        InlineKeyboardButton(
+                            text="Do'stlarga yuborish",
+                            switch_inline_query=f"{movie_code}"  # movie_code ni yuborish
+                        ),
+                        InlineKeyboardButton(
+                            text="📥 Saqlash", callback_data=f"save_movie:{movie_code}"  # Callbackda movie_codeni berish
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🛒 Saqlanganlar", callback_data="kor_kino"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+                        InlineKeyboardButton(text="Keyingisi⏩", callback_data="rand2")
+                    ]
+                ],
+                row_width=2
+            )
+
+            # Delete the previous message before sending the new one
+            await bot.delete_message(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id
+            )
+
+            # Send the video with updated download count
+            if video_file_id:
+                await bot.send_video(
+                    chat_id=callback_query.message.chat.id,
+                    video=video_file_id,
+                    caption=f"🎬 **{name}**\n\n📖 {description}\n👁️: <b>{new_download_count}</b>",
+                    reply_markup=inline,
+                    parse_mode="HTML"
+                )
+            else:
+                await bot.send_message(
+                    chat_id=callback_query.message.chat.id,
+                    text=f"🎬 **{name}**\n\n📖 {description}\n👁️: <b>{new_download_count}</b>",
+                    reply_markup=inline,
+                    parse_mode="HTML"
+                )
+        else:
+            await bot.send_message(
+                chat_id=callback_query.message.chat.id,
+                text="Hozircha kinolar bazada yo'q."
+            )
+
+    # Acknowledge callback query
+    await callback_query.answer()
+
 
 
 
@@ -1338,11 +1501,14 @@ async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
                 [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
-                [InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat=""),
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )],
+                    ),
+                    InlineKeyboardButton(
+                        text="🎲Random", callback_data="random")
+                        ],
                 [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
             ],row_width=2
         )
@@ -1386,7 +1552,7 @@ async def handle_suggestion(message: types.Message, state: FSMContext):
 # 
     
 async def export_users():
-    conn = sqlite3.connect('moviebot.db')
+    conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
     cursor.execute('SELECT user_id FROM userid')
@@ -1415,7 +1581,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
     movie_code = msg.text
 
     # Bazaga ulanish
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Kanal obunalarini tekshirish
@@ -1445,7 +1611,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
         return  # Davom ettirmaslik
 
     # Kino ma'lumotlarini bazadan olish
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name, description, video_file_id, download_count FROM movies WHERE movie_code = ?", (movie_code,))
         movie_data = cursor.fetchone()
@@ -1463,7 +1629,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
     try:
         # Yuklab olish hisobini yangilash (bazada)
         new_download_count = download_count + 1
-        with sqlite3.connect('moviebot.db') as conn:
+        with sqlite3.connect('kinosaroy1bot.db') as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE movies SET download_count = ? WHERE movie_code = ?", (new_download_count, movie_code))
             conn.commit()
@@ -1487,7 +1653,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
                     
                 ],
                 [
-                    InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat="")
+                    InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")
                 ]
             ],
             row_width=2
@@ -1518,7 +1684,7 @@ async def show_top_movies(callback_query: types.CallbackQuery):
         ],row_width=2
     )
 
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Eng ko'p yuklangan 10 ta kinoni olish
@@ -1556,11 +1722,14 @@ async def backs(calmes:types.CallbackQuery):
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
                 [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
-                [InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat=""),
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )],
+                    ),
+                    InlineKeyboardButton(
+                        text="🎲Random", callback_data="random")
+                        ],
                 [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
             ],row_width=2
         )
@@ -1587,12 +1756,12 @@ async def send_movie_from_top(callback_query: types.CallbackQuery):
                     ),
                     
                 ],
-                [InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat="")]
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")]
             ],
             row_width=2
         )
 
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Kino ma'lumotlarini olish
@@ -1607,7 +1776,7 @@ async def send_movie_from_top(callback_query: types.CallbackQuery):
 
     # Yuklashlar sonini yangilash
     new_download_count = download_count + 1
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE movies SET download_count = ? WHERE movie_code = ?", (new_download_count, movie_code))
         conn.commit()
@@ -1634,7 +1803,7 @@ async def save_movie(callback_query: types.CallbackQuery):
     # Callback data'dan movie_code ni olish
     movie_code = callback_query.data.split(":")[1]  # "save_movie:<movie_code>" dan movie_code ni ajratib olish
 
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Kino allaqachon saqlanganligini tekshirish
@@ -1667,7 +1836,7 @@ async def show_saved_movies(callback_query: types.CallbackQuery):
         ],row_width=2
     )
     # Fetch saved movies for the user
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT m.name, m.description, m.video_file_id, m.movie_code "
@@ -1737,14 +1906,14 @@ async def send_selected_movie(callback_query: types.CallbackQuery):
                 
             ],
             [
-                InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat="")
+                InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")
             ]
         ],
         row_width=2
     )
 
     # Fetch movie details from the database
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name, description, video_file_id, download_count FROM movies WHERE movie_code = ?", (movie_code,))
         movie_data = cursor.fetchone()
@@ -1762,7 +1931,7 @@ async def send_selected_movie(callback_query: types.CallbackQuery):
     description = description or "Tavsif mavjud emas."
 
     # Update download count (increase by 1)
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE movies SET download_count = download_count + 1 WHERE movie_code = ?", (movie_code,))
         conn.commit()
@@ -1790,7 +1959,7 @@ async def clear_saved_movies(callback_query: types.CallbackQuery):
     )
     user_id = callback_query.from_user.id
 
-    with sqlite3.connect('moviebot.db') as conn:
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
         # Foydalanuvchining barcha saqlangan kinolarini o'chirish
@@ -1812,11 +1981,14 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
                 [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
-                [InlineKeyboardButton(text="Qidirish...", switch_inline_query_current_chat=""),
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )],
+                    ),
+                    InlineKeyboardButton(
+                        text="🎲Random", callback_data="random")
+                        ],
                 [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
             ],row_width=2
         )
