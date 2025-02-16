@@ -1227,7 +1227,7 @@ async def start(message: types.Message, state: FSMContext):
         keyboard = InlineKeyboardMarkup(row_width=1)
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))
-        keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/kinosaroyibot"))
+        keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/ar7.movie"))
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
         await message.reply(
@@ -1289,7 +1289,7 @@ async def start(message: types.Message, state: FSMContext):
         # Obunadan o'tganlar uchun asosiy menyu
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1500,7 +1500,7 @@ async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1599,7 +1599,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
         keyboard = InlineKeyboardMarkup(row_width=1)
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))
-        keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/kinosaroyibot"))
+        keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/ar7.movie"))
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True"))
 
         await msg.reply(
@@ -1721,7 +1721,7 @@ async def backs(calmes:types.CallbackQuery):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1980,7 +1980,7 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/KinoSaroyi")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
