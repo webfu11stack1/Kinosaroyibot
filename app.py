@@ -483,10 +483,11 @@ async def fmes(fmes: types.Message, state: FSMContext):
 
     yetkazilganlar = 0
     yetkazilmaganlar = 0
+    blok_qilganlar = 0  # Blok qilgan foydalanuvchilar soni
 
     cursor.execute("SELECT DISTINCT user_id FROM userid")
     user_ids = cursor.fetchall()
-    blocked_users = [] 
+
     for user_id in user_ids:
         try:
             await bot.forward_message(
@@ -496,21 +497,24 @@ async def fmes(fmes: types.Message, state: FSMContext):
             )
             yetkazilganlar += 1
         except BotBlocked:
-            blocked_users.append(user_id[0])
+            blok_qilganlar += 1
         except MessageToForwardNotFound:
             await fmes.answer("Berilgan xabarni topib bo'lmadi.")
             return
+        except ChatNotFound:
+            yetkazilmaganlar += 1
         except Exception as e:
             print(f"Error: {e}")
             yetkazilmaganlar += 1
 
     await fmes.answer(
         f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
-        f"🚀Yetkazildi : <b>{yetkazilganlar}</b> ta\n"
-        f"🛑Yetkazilmadi : <b>{yetkazilmaganlar}</b> ta",
+        f"🚀 Yetkazildi : <b>{yetkazilganlar}</b> ta\n"
+        f"🛑 Yetkazilmadi : <b>{yetkazilmaganlar}</b> ta\n"
+        f"❌ Blok qilganlar : <b>{blok_qilganlar}</b> ta",
         parse_mode="HTML"
     )
-    await fmes.answer(f"Blok qilganlar : {blocked_users} ta")
+    
     await state.finish()
 
     
