@@ -6,7 +6,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils import executor
 from difflib import get_close_matches
 import re
-from functools import lru_cache
+from aiogram.dispatcher import FSMContext
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 
 import shutil
@@ -2033,8 +2034,7 @@ all_movie_titles = []
 # Foydalanuvchilar uchun ma'lumotlarni saqlash
 user_data = {}
 
-# Sahifalarni keshlash uchun funksiya (lru_cache yordamida)
-@lru_cache(maxsize=100)
+# Sahifalarni yuklash uchun funksiya
 async def fetch_page(url):
     async with aiohttp.ClientSession() as session:
         try:
@@ -2152,7 +2152,7 @@ async def name_search(callback_query: types.CallbackQuery, state: FSMContext):
 
 # Kino qidirish
 @dp.message_handler(state="*")
-async def search_movie(message: types.Message):
+async def search_movie(message: types.Message, state: FSMContext):
     user_query = message.text.strip()
     waiting_message = await message.answer("⏳ Kino qidirilmoqda, kutib turing...")
     
