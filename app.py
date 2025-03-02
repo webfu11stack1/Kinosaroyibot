@@ -1,15 +1,3 @@
-import aiohttp
-import asyncio
-from bs4 import BeautifulSoup
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils import executor
-from difflib import get_close_matches
-import re
-from aiogram.dispatcher import FSMContext
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-
-
 import shutil
 import sqlite3
 from aiogram import Bot, Dispatcher, types,executor
@@ -80,8 +68,8 @@ with sqlite3.connect('kinosaroy1bot.db') as conn:
 conn.commit()
 
 
-TOKEN = "7132267047:AAFG_-7EjOA-8NCPBoKnmI4xEr6DBEpYgeQ"
-bot = Bot(token=TOKEN)
+bot_token = "7132267047:AAFG_-7EjOA-8NCPBoKnmI4xEr6DBEpYgeQ"
+bot = Bot(token=bot_token)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
@@ -1306,8 +1294,7 @@ async def start(message: types.Message, state: FSMContext):
         # Obunadan o'tganlar uchun asosiy menyu
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="✍️Nomi bilan qidirish",callback_data="name_search")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1325,7 +1312,6 @@ async def start(message: types.Message, state: FSMContext):
             parse_mode="MARKDOWN",
             reply_markup=kanalim
         )
-        await state.set_state("name_qidir")
 
 @dp.callback_query_handler(lambda c: c.data == "random")
 async def send_random_movie(callback_query: types.CallbackQuery):
@@ -1406,7 +1392,7 @@ async def send_random_movie(callback_query: types.CallbackQuery):
 
 
 
-@dp.callback_query_handler(lambda c: c.data == "rand2",state="*")
+@dp.callback_query_handler(lambda c: c.data == "rand2")
 async def send_random_movie(callback_query: types.CallbackQuery):
     # Establish database connection and create cursor
     with sqlite3.connect('kinosaroy1bot.db') as conn:
@@ -1501,7 +1487,7 @@ class SuggestionStates(StatesGroup):
     waiting_for_suggestion = State()  # Waiting for the user's suggestion
 
 # Handle "Savol yoki Taklif Yuborish" button click
-@dp.callback_query_handler(lambda call: call.data=="send_suggestion_",state="*")
+@dp.callback_query_handler(lambda call: call.data=="send_suggestion_")
 async def ask_suggestion(call: types.CallbackQuery,state:FSMContext):
     savekb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -1519,8 +1505,7 @@ async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="✍️Nomi bilan qidirish",callback_data="name_search")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1533,7 +1518,7 @@ async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
             ],row_width=2
         )
    
-    await callback_query.message.edit_text("Kino kerakmi? \n``` Kerakli kino kodini, nomini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!```",parse_mode="MARKDOWN",reply_markup=kanalim)
+    await callback_query.message.edit_text("Kino kerakmi? \n``` Kerakli kino kodini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!```",parse_mode="MARKDOWN",reply_markup=kanalim)
     await state.finish()
 # Handle the user's suggestion and send it to the admin bot
 @dp.message_handler(state=SuggestionStates.waiting_for_suggestion)
@@ -1695,7 +1680,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
 
 
 
-@dp.callback_query_handler(lambda c: c.data == "top_movies",state="*")
+@dp.callback_query_handler(lambda c: c.data == "top_movies")
 async def show_top_movies(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     savekb = InlineKeyboardMarkup(
@@ -1736,13 +1721,12 @@ async def show_top_movies(callback_query: types.CallbackQuery):
     )
 
 
-@dp.callback_query_handler(lambda c:c.data=="backs",state="*")
+@dp.callback_query_handler(lambda c:c.data=="backs")
 async def backs(calmes:types.CallbackQuery):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="✍️Nomi bilan qidirish",callback_data="name_search")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -1756,7 +1740,7 @@ async def backs(calmes:types.CallbackQuery):
         )
     await calmes.message.edit_text("Kino kerakmi? \n``` Kerakli kino kodini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!```",parse_mode="MARKDOWN",reply_markup=kanalim)
 
-@dp.callback_query_handler(lambda c: c.data.startswith("movie__"),state="*")
+@dp.callback_query_handler(lambda c: c.data.startswith("movie__"))
 async def send_movie_from_top(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     movie_code = callback_query.data.split("__")[1]  # Movie code ni ajratib olish
@@ -1817,7 +1801,7 @@ async def send_movie_from_top(callback_query: types.CallbackQuery):
 
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith("save_movie:"),state="*")
+@dp.callback_query_handler(lambda c: c.data.startswith("save_movie:"))
 async def save_movie(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
 
@@ -1848,7 +1832,7 @@ async def save_movie(callback_query: types.CallbackQuery):
             await callback_query.answer("✅Kino muvaffaqiyatli saqlandi!", show_alert=True)
 
 # "Saqlanganlar" tugmasi uchun callback handler
-@dp.callback_query_handler(lambda c: c.data == "kor_kino",state="*")
+@dp.callback_query_handler(lambda c: c.data == "kor_kino")
 async def show_saved_movies(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     savekb = InlineKeyboardMarkup(
@@ -1906,7 +1890,7 @@ async def show_saved_movies(callback_query: types.CallbackQuery):
             )
 
 # Callback handler for selecting a movie by number
-@dp.callback_query_handler(lambda c: c.data.startswith("select_movie:"),state="*")
+@dp.callback_query_handler(lambda c: c.data.startswith("select_movie:"))
 async def send_selected_movie(callback_query: types.CallbackQuery):
     movie_code = callback_query.data.split(":")[1]  # Extract movie code
     inline = InlineKeyboardMarkup(
@@ -1971,7 +1955,7 @@ async def send_selected_movie(callback_query: types.CallbackQuery):
         await callback_query.answer("❌ Noto'g'ri video fayli yoki ID.", show_alert=True)
 
 
-@dp.callback_query_handler(lambda c: c.data == "clear_saved_movies",state="*")
+@dp.callback_query_handler(lambda c: c.data == "clear_saved_movies")
 async def clear_saved_movies(callback_query: types.CallbackQuery):
     savekb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -1996,13 +1980,12 @@ async def clear_saved_movies(callback_query: types.CallbackQuery):
     )
 
 # Cancel button handler
-@dp.callback_query_handler(lambda c: c.data == "cancel",state="*")
+@dp.callback_query_handler(lambda c: c.data == "cancel")
 async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="✍️Nomi bilan qidirish",callback_data="name_search")],
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
@@ -2018,246 +2001,6 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     await callback_query.message.edit_text("Kino kerakmi? \n``` Kerakli kino kodini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!```",parse_mode="MARKDOWN",reply_markup=kanalim)
     await state.finish()
 
-
-    
-
-
-
-BASE_URL = "http://asilmedia.org/films/tarjima_kinolar/page/{}/"
-LAST_NEWS_URL = "http://asilmedia.org/lastnews/"
-
-
-
-# Barcha kino nomlarini saqlash uchun ro'yxat
-all_movie_titles = []
-
-# Foydalanuvchilar uchun ma'lumotlarni saqlash
-user_data = {}
-
-# Sahifalarni yuklash uchun funksiya
-async def fetch_page(url):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    return await response.text()
-                return None
-        except Exception as e:
-            print(f"Xatolik: {e}")
-            return None
-
-# Kinolarni sahifadan qidirish (asinxron)
-async def scrape_movies_from_page(url, query):
-    try:
-        html = await fetch_page(url)
-        if not html:
-            return None
-        
-        soup = BeautifulSoup(html, "html.parser")
-        movies = soup.find_all("header", class_="moviebox-meta")
-        
-        for movie in movies:
-            title_tag = movie.find("h2", class_="title")
-            if title_tag:
-                original_title = title_tag.text.strip()
-                normalized_title = re.sub(r"\s+", "", original_title.lower())
-                
-                # Kino nomlarini ro'yxatga qo'shish
-                all_movie_titles.append(original_title)
-                
-                # Qidiruvni kuchaytirish: Boshidagi 3 ta harf yoki Levenshtein masofasi
-                if (query in normalized_title or
-                    get_close_matches(query, [normalized_title], n=1, cutoff=0.6) or
-                    (len(query) >= 3 and normalized_title.startswith(query[:3]))):
-                    parent_a = title_tag.find_parent("a")
-                    if parent_a and parent_a.has_attr("href"):
-                        movie_page_url = parent_a["href"]
-                        download_links = await get_download_links(movie_page_url)
-                        
-                        # Rasm manzilini olish
-                        poster_tag = soup.find("div", class_="moviebox-poster")
-                        poster_url = None
-                        if poster_tag:
-                            poster_img = poster_tag.find("img")
-                            if poster_img and poster_img.has_attr("src"):
-                                poster_url = poster_img["src"]
-                                if not poster_url.startswith("http"):
-                                    poster_url = "https://asilmedia.org" + poster_url
-                        
-                        if download_links:
-                            return (original_title, download_links, poster_url)
-        return None
-    except Exception as e:
-        print(f"Xatolik: {e}")
-        return None
-
-# Yuklab olish havolalarini olish (asinxron)
-async def get_download_links(movie_page_url):
-    try:
-        html = await fetch_page(movie_page_url)
-        if not html:
-            return []
-        
-        soup = BeautifulSoup(html, "html.parser")
-        download_links = []
-        
-        for link in soup.find_all("a", href=True):
-            if "yuklab olish" in link.text.lower() or "скачать" in link.text.lower():
-                link_text = link.text.strip().replace("Скачать", "Onlayn ko'rish")
-                download_links.append((link_text, link["href"]))
-        
-        return download_links
-    except Exception as e:
-        print(f"Xatolik: {e}")
-        return []
-
-# Butun saytni qidirish (asinxron)
-async def scrape_entire_site(query):
-    query = re.sub(r"\s+", "", query.lower())
-    
-    # Avval "lastnews" sahifasini tekshirish
-    last_news_result = await scrape_movies_from_page(LAST_NEWS_URL, query)
-    if last_news_result:
-        return last_news_result
-    
-    # Barcha sahifalarni qidirish
-    page = 1
-    while True:
-        url = BASE_URL.format(page)
-        result = await scrape_movies_from_page(url, query)
-        
-        if result:
-            return result  # Moslik topilganda qidiruvni to'xtatish
-        
-        # Agar sahifa mavjud bo'lmasa yoki kinolar tugasa, tsiklni to'xtatish
-        html = await fetch_page(url)
-        if not html:
-            break
-        
-        soup = BeautifulSoup(html, "html.parser")
-        movies = soup.find_all("header", class_="moviebox-meta")
-        if not movies:
-            break
-        
-        page += 1  # Keyingi sahifaga o'tish
-    
-    return None
-
-
-@dp.callback_query_handler(lambda c: c.data == "name_search", state="*")
-async def name_search(callback_query: types.CallbackQuery, state: FSMContext):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(callback_query.message.chat.id, "🎬 Kino nomini kiriting:")
-    await state.set_state('name_s')
-
-# Kino qidirish
-@dp.message_handler(state="*")
-async def search_movie(message: types.Message, state: FSMContext):
-    user_query = message.text.strip()
-    waiting_message = await message.answer("⏳ Kino qidirilmoqda, kutib turing...")
-    
-    result = await scrape_entire_site(user_query)
-    await bot.delete_message(message.chat.id, waiting_message.message_id)
-    
-    if result:
-        title, download_links, poster_url = result
-        # Foydalanuvchi ma'lumotlarini saqlash
-        user_data[message.chat.id] = {
-            "title": title,
-            "download_links": download_links,
-            "poster_url": poster_url,
-            "page": 0  # Sahifa raqami
-        }
-        await send_download_links(message.chat.id, title, download_links, poster_url, page=0)
-    else:
-        # Eng yaqin natijalarni taklif qilish
-        if all_movie_titles:
-            prefix_matches = [title for title in all_movie_titles if title.lower().startswith(user_query[:3])]
-            close_matches = get_close_matches(user_query, all_movie_titles, n=3, cutoff=0.4)
-            suggestions = list(set(prefix_matches + close_matches))[:3]
-            if suggestions:
-                text = "❌ Kino topilmadi. Quyidagilardan birini tanlang:\n\n" + "\n".join(suggestions)
-                await message.answer(text)
-            else:
-                await message.answer("❌ Kino topilmadi. Iltimos, boshqa nom bilan urinib ko‘ring.")
-        else:
-            await message.answer("❌ Kino topilmadi. Iltimos, boshqa nom bilan urinib ko‘ring.")
-
-# Yuklab olish havolalarini yuborish
-async def send_download_links(chat_id, title, download_links, poster_url, page=0):
-    text = f"🎥 **{title}**\n\n⬇️ Yuklab olish uchun quyidagi havolalardan foydalaning:"
-    
-    # Tugmalarni sahifalash
-    page_size = 5  # Har bir sahifada 5 ta tugma
-    total_pages = (len(download_links) + page_size - 1) // page_size  # Jami sahifalar soni
-    
-    start = page * page_size
-    end = start + page_size
-    chunk = download_links[start:end]  # Joriy sahifa uchun tugmalar
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    
-    for link_text, link_url in chunk:
-        # URL manzilini tozalash
-        link_url = link_url.strip()  # Bo'sh joylarni olib tashlash
-        if not link_url.startswith(("http://", "https://")):
-            # Agar URL "http://" yoki "https://" bilan boshlanmasa, uni to'g'ri formatga keltirish
-            link_url = "https://" + link_url
-        
-        # Faqat to'g'ri URL manzillarini qo'shish
-        if link_url.startswith(("http://", "https://")):
-            keyboard.add(InlineKeyboardButton(link_text, url=link_url))
-        else:
-            print(f"Noto'g'ri URL manzili: {link_url}")  # Debug uchun
-    
-    # "Keyingi" tugmasini qo'shish
-    if page < total_pages - 1:
-        keyboard.add(InlineKeyboardButton("Keyingi ➡️", callback_data=f"next_page_{page + 1}"))
-    
-    # "Oldingi" tugmasini qo'shish (agar sahifa 0 dan katta bo'lsa)
-    if page > 0:
-        keyboard.add(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"prev_page_{page - 1}"))
-    
-    # Agar rasm mavjud bo'lsa, faqat birinchi sahifada rasm bilan yuborish
-    if page == 0 and poster_url:
-        await bot.send_photo(chat_id, photo=poster_url, caption=text, reply_markup=keyboard, parse_mode="Markdown")
-    else:
-        await bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="Markdown")
-
-# Callback query handler (Keyingi sahifa uchun)
-@dp.callback_query_handler(lambda c: c.data.startswith('next_page_'))
-async def process_callback_next_page(callback_query: types.CallbackQuery):
-    chat_id = callback_query.message.chat.id
-    page = int(callback_query.data.split('_')[-1])  # Sahifa raqamini olish
-    
-    # Foydalanuvchi ma'lumotlarini olish
-    if chat_id in user_data:
-        title = user_data[chat_id]["title"]
-        download_links = user_data[chat_id]["download_links"]
-        poster_url = user_data[chat_id]["poster_url"]
-        
-        # Yangi sahifani yuborish
-        await send_download_links(chat_id, title, download_links, poster_url, page=page)
-    else:
-        await bot.answer_callback_query(callback_query.id, "Xatolik: Ma'lumotlar topilmadi.")
-
-# Callback query handler (Oldingi sahifa uchun)
-@dp.callback_query_handler(lambda c: c.data.startswith('prev_page_'))
-async def process_callback_prev_page(callback_query: types.CallbackQuery):
-    chat_id = callback_query.message.chat.id
-    page = int(callback_query.data.split('_')[-1])  # Sahifa raqamini olish
-    
-    # Foydalanuvchi ma'lumotlarini olish
-    if chat_id in user_data:
-        title = user_data[chat_id]["title"]
-        download_links = user_data[chat_id]["download_links"]
-        poster_url = user_data[chat_id]["poster_url"]
-        
-        # Yangi sahifani yuborish
-        await send_download_links(chat_id, title, download_links, poster_url, page=page)
-    else:
-        await bot.answer_callback_query(callback_query.id, "Xatolik: Ma'lumotlar topilmadi.")
-
-# Dasturni ishga tushurish
 if __name__ == '__main__':
+    # dp.middleware.setup(LoggingMiddleware())  
     executor.start_polling(dp, skip_updates=True)
