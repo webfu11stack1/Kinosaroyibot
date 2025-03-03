@@ -2147,7 +2147,7 @@ async def start(calbakm: types.CallbackQuery,state:FSMContext):
     await calbakm.message.answer("🎬 Kategoriyani tanlang:", reply_markup=category_keyboard())
 
 @dp.callback_query_handler(lambda call: call.data.startswith("category_"),state="*")
-async def category_selected(call: types.CallbackQuery):
+async def category_selected(call: types.CallbackQuery,state:FSMContext):
     user_id = call.from_user.id
     category = call.data.split("_", 1)[1]
     
@@ -2160,14 +2160,13 @@ async def category_selected(call: types.CallbackQuery):
         f"✅ {call.message.chat.first_name}, siz **{category.replace('_', ' ').capitalize()}** kategoriyasini tanladingiz!\n\n🎬 Kino nomini yozing:"
     )
 
-@dp.message_handler(state="*")
+    await state.set_state("cat_tanla")
+
+@dp.message_handler(state="cat_tanla")
 async def search_movie(message: types.Message):
     user_id = message.from_user.id
     categories = user_categories.get(user_id)
-    
-    # Agar foydalanuvchi kategoriya tanlamagan bo'lsa, barcha kategoriyalardan qidirish
-    if categories is None:
-        categories = list(CATEGORY_URLS.keys())
+
     
     user_query = message.text.strip()
     waiting_message = await message.answer("⏳ Kino yuklanmoqda, kutib turing...")
