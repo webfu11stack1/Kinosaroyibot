@@ -251,9 +251,10 @@ async def get_movie_video(message: Message, state: FSMContext):
 
 from aiogram.types import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, InlineKeyboardButton
 import hashlib
-@dp.inline_handler()
 
-async def inline_query_handler(query: types.InlineQuery,state:FSMContext):
+
+@dp.inline_handler()
+async def inline_query_handler(query: types.InlineQuery):
     query_text = query.query.strip()  # Foydalanuvchi kiritgan qidiruv matni
     offset = int(query.offset) if query.offset else 0  # Sahifa raqami
     results = await search_data(query_text)  # Qidiruv funksiyasidan natijalar
@@ -310,8 +311,6 @@ async def inline_query_handler(query: types.InlineQuery,state:FSMContext):
         is_personal=True,
         next_offset=next_offset  # Keyingi sahifani ko'rsatish
     )
-    await state.finish()
-
 
 
 @dp.message_handler(text="⛔️Kino o'chirish", state="*")
