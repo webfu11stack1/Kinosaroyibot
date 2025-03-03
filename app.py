@@ -247,16 +247,16 @@ async def get_movie_video(message: Message, state: FSMContext):
     await state.finish()
 
 
-from aiogram.types import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, InlineKeyboardButton
 import hashlib
-
+from aiogram.types import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, InlineKeyboardButton
 @dp.inline_handler()
 async def inline_query_handler(query: types.InlineQuery):
     query_text = query.query.strip()  # Foydalanuvchi kiritgan qidiruv matni
+    offset = int(query.offset) if query.offset else 0  # Sahifa raqami
     results = await search_data(query_text)  # Qidiruv funksiyasidan natijalar
 
     inline_results = []
-    for result in results:
+    for result in results[offset:offset + 50]:  # Faqat 50 ta natijani qaytarish
         if result["file_id"]:  # Faqat fayl ID mavjud bo'lsa
             # Unikal ID yaratish (hashlib orqali)
             unique_id = hashlib.md5(f"{result['movie_code']}{result['name']}".encode()).hexdigest()
@@ -296,14 +296,17 @@ async def inline_query_handler(query: types.InlineQuery):
             )
         )
 
+    # Keyingi sahifani ko'rsatish uchun offset ni yangilash
+    next_offset = str(offset + 50) if offset + 50 < len(results) else None
+
     # Inline queryga javob berish
     await bot.answer_inline_query(
         query.id,
         results=inline_results,
         cache_time=1,  # Tezkor javoblar uchun cache vaqtini minimal qilish
-        is_personal=True
+        is_personal=True,
+        next_offset=next_offset  # Keyingi sahifani ko'rsatish
     )
-
 
 
 
