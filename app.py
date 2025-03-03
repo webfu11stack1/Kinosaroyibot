@@ -249,6 +249,7 @@ async def get_movie_video(message: Message, state: FSMContext):
 
 import hashlib
 from aiogram.types import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardMarkup, InlineKeyboardButton
+
 @dp.inline_handler()
 async def inline_query_handler(query: types.InlineQuery):
     query_text = query.query.strip()  # Foydalanuvchi kiritgan qidiruv matni
@@ -307,6 +308,7 @@ async def inline_query_handler(query: types.InlineQuery):
         is_personal=True,
         next_offset=next_offset  # Keyingi sahifani ko'rsatish
     )
+
 
 
 
