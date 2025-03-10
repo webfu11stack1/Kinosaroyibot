@@ -461,7 +461,7 @@ async def send_message_to_user(message: types.Message, state: FSMContext):
 
     # Try sending the message to the specified user_id
     try:
-        await bot.send_message(user_id, f"👤Admindan xabar:\n``` {admin_message}  ```",parse_mode="Markdown")
+        await bot.send_message(user_id, f"👤Admindan xabar:\n {admin_message} ")
         await message.answer("Xabar yuborildi.")
     except Exception as e:
         print(f"Error: {e}")
