@@ -71,7 +71,7 @@ with sqlite3.connect('kinosaroy1bot.db') as conn:
 conn.commit()
 
 
-TOKEN = ""
+TOKEN = "7132267047:AAFG_-7EjOA-8NCPBoKnmI4xEr6DBEpYgeQ"
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -473,8 +473,7 @@ async def send_message_to_user(message: types.Message, state: FSMContext):
 
 
 
-#Forward message
-import re
+import asyncio
 from aiogram.utils.exceptions import BotBlocked, ChatNotFound, MessageToForwardNotFound
 
 @dp.message_handler(text="🔗Forward xabar", state="*")
@@ -485,23 +484,24 @@ async def forwardmes(fmessage: types.Message, state: FSMContext):
 @dp.message_handler(state="fmes")
 async def fmes(fmes: types.Message, state: FSMContext):
     try:
-        f_mes = int(fmes.text)  # Foydalanuvchidan olingan raqam
+        f_mes = int(fmes.text)  # Foydalanuvchidan olingan xabar raqami
     except ValueError:
         await fmes.answer("Iltimos, to'g'ri xabar raqamini kiriting!")
         return
 
     yetkazilganlar = 0
     yetkazilmaganlar = 0
-    blok_qilganlar = 0  # Blok qilgan foydalanuvchilar soni
+    blok_qilganlar = 0  
 
     cursor.execute("SELECT DISTINCT user_id FROM userid")
-    user_ids = cursor.fetchall()
+    user_ids = [row[0] for row in cursor.fetchall()]  
 
-    for user_id in user_ids:
+    async def forward_to_user(user_id):
+        nonlocal yetkazilganlar, yetkazilmaganlar, blok_qilganlar
         try:
             await bot.forward_message(
-                chat_id=user_id[0], 
-                from_chat_id='@sjsksnsbsh', 
+                chat_id=user_id,
+                from_chat_id='@sjsksnsbsh',
                 message_id=f_mes
             )
             yetkazilganlar += 1
@@ -509,12 +509,18 @@ async def fmes(fmes: types.Message, state: FSMContext):
             blok_qilganlar += 1
         except MessageToForwardNotFound:
             await fmes.answer("Berilgan xabarni topib bo'lmadi.")
-            return
         except ChatNotFound:
             yetkazilmaganlar += 1
         except Exception as e:
             print(f"Error: {e}")
             yetkazilmaganlar += 1
+        await asyncio.sleep(0.02)  # Telegram bloklamasligi uchun kutish
+
+    # Parallel yuborish (100 tadan bo‘lib yuborish)
+    batch_size = 100
+    for i in range(0, len(user_ids), batch_size):
+        batch = user_ids[i : i + batch_size]
+        await asyncio.gather(*(forward_to_user(user_id) for user_id in batch))
 
     await fmes.answer(
         f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
@@ -523,8 +529,9 @@ async def fmes(fmes: types.Message, state: FSMContext):
         f"❌ Blok qilganlar : <b>{blok_qilganlar}</b> ta",
         parse_mode="HTML"
     )
-    
+
     await state.finish()
+
 
 
     
