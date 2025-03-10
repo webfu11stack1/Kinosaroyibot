@@ -71,7 +71,7 @@ with sqlite3.connect('kinosaroy1bot.db') as conn:
 conn.commit()
 
 
-TOKEN = ""
+TOKEN = "7132267047:AAFG_-7EjOA-8NCPBoKnmI4xEr6DBEpYgeQ"
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -475,23 +475,23 @@ async def send_message_to_user(message: types.Message, state: FSMContext):
 
 import asyncio
 from aiogram.utils.exceptions import BotBlocked, ChatNotFound, MessageToForwardNotFound
+from aiogram.types import Message
+from aiogram.dispatcher import FSMContext
 
 @dp.message_handler(text="🔗Forward xabar", state="*")
-async def forwardmes(fmessage: types.Message, state: FSMContext):
+async def forwardmes(fmessage: Message, state: FSMContext):
     await fmessage.answer("Xabarni havola linki yoki raqamini yuboring!")
     await state.set_state("fmes")
 
 @dp.message_handler(state="fmes")
-async def fmes(fmes: types.Message, state: FSMContext):
+async def fmes(fmes: Message, state: FSMContext):
     try:
-        f_mes = int(fmes.text)  # Foydalanuvchidan olingan xabar raqami
+        f_mes = int(fmes.text)  # Xabar raqamini olish
     except ValueError:
         await fmes.answer("Iltimos, to'g'ri xabar raqamini kiriting!")
         return
 
-    yetkazilganlar = 0
-    yetkazilmaganlar = 0
-    blok_qilganlar = 0  
+    yetkazilganlar, yetkazilmaganlar, blok_qilganlar = 0, 0, 0  
 
     cursor.execute("SELECT DISTINCT user_id FROM userid")
     user_ids = [row[0] for row in cursor.fetchall()]  
@@ -501,23 +501,22 @@ async def fmes(fmes: types.Message, state: FSMContext):
         try:
             await bot.forward_message(
                 chat_id=user_id,
-                from_chat_id='@sjsksnsbsh',
+                from_chat_id=-1001736313573,  # 🎯 **Kanal ID ni to‘g‘ri yozing!**
                 message_id=f_mes
             )
             yetkazilganlar += 1
         except BotBlocked:
             blok_qilganlar += 1
         except MessageToForwardNotFound:
-            await fmes.answer("Berilgan xabarni topib bo'lmadi.")
+            return  # Butun jarayon to‘xtamasligi kerak!
         except ChatNotFound:
             yetkazilmaganlar += 1
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error with {user_id}: {e}")
             yetkazilmaganlar += 1
-        await asyncio.sleep(0.02)  # Telegram bloklamasligi uchun kutish
+        await asyncio.sleep(0.05)  # Telegram cheklovidan qochish
 
-    # Parallel yuborish (100 tadan bo‘lib yuborish)
-    batch_size = 100
+    batch_size = 50  # 🚀 **Tepalik yuborish uchun 50 ta user bo‘lib ishlash**
     for i in range(0, len(user_ids), batch_size):
         batch = user_ids[i : i + batch_size]
         await asyncio.gather(*(forward_to_user(user_id) for user_id in batch))
@@ -531,7 +530,6 @@ async def fmes(fmes: types.Message, state: FSMContext):
     )
 
     await state.finish()
-
 
 
     
