@@ -474,27 +474,29 @@ async def send_message_to_user(message: types.Message, state: FSMContext):
 
 
 import asyncio
-from aiogram.utils.exceptions import BotBlocked, ChatNotFound, MessageToForwardNotFound
-from aiogram.types import Message
+from aiogram import types
+from aiogram.utils.exceptions import (
+    BotBlocked, ChatNotFound, MessageToForwardNotFound, RetryAfter
+)
 from aiogram.dispatcher import FSMContext
 
 @dp.message_handler(text="🔗Forward xabar", state="*")
-async def forwardmes(fmessage: Message, state: FSMContext):
-    await fmessage.answer("Xabarni havola linki yoki raqamini yuboring!")
+async def forwardmes(fmessage: types.Message, state: FSMContext):
+    await fmessage.answer("Xabarni havola linki yoki raqamini yuboring! (Masalan, 123)")
     await state.set_state("fmes")
 
 @dp.message_handler(state="fmes")
-async def fmes(fmes: Message, state: FSMContext):
+async def fmes(fmes: types.Message, state: FSMContext):
     try:
         f_mes = int(fmes.text)  # Xabar raqamini olish
     except ValueError:
-        await fmes.answer("Iltimos, to'g'ri xabar raqamini kiriting!")
-        return
+        return await fmes.answer("❌ Iltimos, to'g'ri xabar raqamini kiriting!")
 
     yetkazilganlar, yetkazilmaganlar, blok_qilganlar = 0, 0, 0  
 
+    # Bazadan foydalanuvchilarni olish (async usulda ishlash uchun)
     cursor.execute("SELECT DISTINCT user_id FROM userid")
-    user_ids = [row[0] for row in cursor.fetchall()]  
+    user_ids = [row[0] for row in cursor.fetchall()]
 
     async def forward_to_user(user_id):
         nonlocal yetkazilganlar, yetkazilmaganlar, blok_qilganlar
@@ -507,29 +509,34 @@ async def fmes(fmes: Message, state: FSMContext):
             yetkazilganlar += 1
         except BotBlocked:
             blok_qilganlar += 1
-        except MessageToForwardNotFound:
-            return  # Butun jarayon to‘xtamasligi kerak!
         except ChatNotFound:
             yetkazilmaganlar += 1
+        except MessageToForwardNotFound:
+            return await fmes.answer("❌ Xabar topilmadi yoki muddati o'tgan!")
+        except RetryAfter as e:
+            await asyncio.sleep(e.timeout)  # ❗ Telegram cheklovidan qochish uchun kutish
+            return await forward_to_user(user_id)  # Qayta yuborish
         except Exception as e:
-            print(f"Error with {user_id}: {e}")
+            print(f"⚠️ Xatolik {user_id}: {e}")
             yetkazilmaganlar += 1
-        await asyncio.sleep(0.05)  # Telegram cheklovidan qochish
+        await asyncio.sleep(0.03)  # ❗ Antiflood uchun 30ms kutish
 
-    batch_size = 50  # 🚀 **Tepalik yuborish uchun 50 ta user bo‘lib ishlash**
+    # 🔥 **Batch (guruh) usulda parallel forward qilish**
+    batch_size = 50
     for i in range(0, len(user_ids), batch_size):
         batch = user_ids[i : i + batch_size]
         await asyncio.gather(*(forward_to_user(user_id) for user_id in batch))
 
     await fmes.answer(
-        f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
-        f"🚀 Yetkazildi : <b>{yetkazilganlar}</b> ta\n"
-        f"🛑 Yetkazilmadi : <b>{yetkazilmaganlar}</b> ta\n"
-        f"❌ Blok qilganlar : <b>{blok_qilganlar}</b> ta",
+        f"<b>✅ Xabar muvaffaqiyatli forward qilindi!</b>\n\n"
+        f"🚀 Yetkazildi: <b>{yetkazilganlar}</b> ta\n"
+        f"🛑 Yetkazilmadi: <b>{yetkazilmaganlar}</b> ta\n"
+        f"❌ Blok qilganlar: <b>{blok_qilganlar}</b> ta",
         parse_mode="HTML"
     )
 
     await state.finish()
+
 
 
     
