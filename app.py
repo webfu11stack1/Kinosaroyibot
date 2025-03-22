@@ -1254,7 +1254,7 @@ async def start(message: types.Message, state: FSMContext):
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))  
         
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url="https://t.me/+A5LLnZkzdOQ3NDdi"))
+        
         keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/ar7.movie"))
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
