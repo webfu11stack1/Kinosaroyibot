@@ -1251,6 +1251,8 @@ async def start(message: types.Message, state: FSMContext):
     if unsubscribed_channels:
         # Agar obuna bo'lmagan kanallar bo'lsa
         keyboard = InlineKeyboardMarkup(row_width=1)
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://t.me/+J9znOihSkQI5ZGE6"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 2",url="https://t.me/+WCWiTmbNIi1lN2Yy"))
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))  
         
