@@ -1253,8 +1253,8 @@ async def start(message: types.Message, state: FSMContext):
         keyboard = InlineKeyboardMarkup(row_width=1)
 
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 2",url="https://t.me/+WCWiTmbNIi1lN2Yy"))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 3",url="https://t.me/+FDHk9y8vLRE1N2Qy"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 2",url="https://t.me/+FDHk9y8vLRE1N2Qy"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 3",url="https://t.me/+4ooZMiT-lmozYzcy"))
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 4",url="https://t.me/+b1HOAC-rZw9iODgy"))
         
         
