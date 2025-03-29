@@ -1337,7 +1337,7 @@ async def start(message: types.Message, state: FSMContext):
         )
         await bot.send_message(
             chat_id=message.chat.id,
-            text=f"Kino kodini botga jonating. Bot kinoni tashlab beradi.",
+            text=f"✍️Kino kodini jonating. Bot kinoni tashlab beradi.",
             parse_mode="MARKDOWN",
             reply_markup=kanalim
         )
@@ -1549,7 +1549,7 @@ async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
             ],row_width=2
         )
    
-    await callback_query.message.edit_text("Botga kino kodini jonating. Kinoni tashlab beradi.",parse_mode="HTML",reply_markup=kanalim)
+    await callback_query.message.edit_text("✍️ Kino kodini jonating. Bot kinoni tashlab beradi.",parse_mode="HTML",reply_markup=kanalim)
     await state.finish()
 # Handle the user's suggestion and send it to the admin bot
 @dp.message_handler(state=SuggestionStates.waiting_for_suggestion)
