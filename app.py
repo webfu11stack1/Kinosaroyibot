@@ -1613,14 +1613,14 @@ async def send_auto_response(callback_query: types.CallbackQuery):
         # Foydalanuvchi ID sini olamiz
         _, user_id = callback_query.data.split(":")
         
-        # Asl xabarni olamiz (foydalanuvchi yuborgan matn)
-        original_message = ""
-        if callback_query.message.reply_to_message:
-            original_message = callback_query.message.reply_to_message.text or callback_query.message.reply_to_message.caption or ""
-        else:
-            original_message = callback_query.message.text or callback_query.message.caption or ""
-        
-        # Xabardan raqamlarni qidirib topamiz
+        # Foydalanuvchi yuborgan ASL xabarni olamiz
+        if not callback_query.message.reply_to_message:
+            await callback_query.answer("❌ Xabarni topib bo'lmadi!", show_alert=True)
+            return
+            
+        original_message = callback_query.message.reply_to_message.text or callback_query.message.reply_to_message.caption or ""
+
+        # Xabardan barcha raqamlarni ajratib olamiz
         movie_code = None
         for word in original_message.split():
             # Faqat raqamlarni ajratib olamiz
@@ -1628,11 +1628,11 @@ async def send_auto_response(callback_query: types.CallbackQuery):
             if digits:  # 1 yoki undan ortiq raqam bo'lsa
                 movie_code = digits
                 break
-        
+
         if movie_code:
-            # Javob matnini tayyorlaymiz (foydalanuvchi yuborgan raqam bilan)
+            # Javob matnini tayyorlaymiz
             response_text = (
-                f"🎬 Siz yuborgan {movie_code} kodli kinoni ko'rish uchun pastdagi tugmani bosing:\n\n"
+                f"🎬 Siz yuborgan {movie_code} kodli kinoni ko'rish uchun quyidagi tugmani bosing:\n\n"
                 f"🔢 Kino kodi: {movie_code}"
             )
             
@@ -1645,19 +1645,15 @@ async def send_auto_response(callback_query: types.CallbackQuery):
                 )
             )
         else:
-            response_text = (
-                "✅ Sizning so'rovingiz qabul qilindi. Tez orada javob beramiz.\n\n"
-                "Agar kinoning kodini yuborgan bo'lsangiz, unda raqamlar aniqlanmadi."
-            )
+            response_text = "✅ Sizning so'rovingiz qabul qilindi. Tez orada javob beramiz."
             keyboard = None
-        
+
         try:
             # Foydalanuvchiga javob yuboramiz
             await bot.send_message(
                 chat_id=user_id,
                 text=response_text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
+                reply_markup=keyboard
             )
             
             # Admin ga xabar beramiz
@@ -1673,11 +1669,11 @@ async def send_auto_response(callback_query: types.CallbackQuery):
             )
             
         except Exception as send_error:
-            print(f"Xatolik: Foydalanuvchiga javob yuborishda - {send_error}")
-            await callback_query.answer("❌ Foydalanuvchi bloklagan yoki xatolik yuz berdi!", show_alert=True)
+            print(f"Xatolik: {send_error}")
+            await callback_query.answer("❌ Javob yuborib bo'lmadi!", show_alert=True)
             
     except Exception as e:
-        print(f"Xatolik: avtomatik javob berishda - {e}")
+        print(f"Xatolik: {e}")
         await callback_query.answer("❌ Xatolik yuz berdi!", show_alert=True)
 
 @dp.callback_query_handler(lambda c: c.data == "already_responded", state="*")
