@@ -1502,88 +1502,151 @@ async def send_random_movie(callback_query: types.CallbackQuery):
 
 
 
-import uuid
-
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.dispatcher.filters import Text
 from aiogram.utils.exceptions import BotBlocked
-
 # Admin's user ID for direct communication (replace with actual admin ID)
 ADMIN_USER_ID = 1996936737  # Example, replace with your admin's user ID
 CHANNEL_ID = "-1002295487802"  # Replace with your actual channel ID
-
-# FSM state for handling suggestions
+# States for suggestion handling
 class SuggestionStates(StatesGroup):
-    waiting_for_suggestion = State()  # Waiting for the user's suggestion
+    waiting_for_suggestion = State()
 
 # Handle "Savol yoki Taklif Yuborish" button click
-@dp.callback_query_handler(lambda call: call.data=="send_suggestion_",state="*")
-async def ask_suggestion(call: types.CallbackQuery,state:FSMContext):
+@dp.callback_query_handler(lambda call: call.data == "send_suggestion_", state="*")
+async def ask_suggestion(call: types.CallbackQuery, state: FSMContext):
     savekb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="❌Bekor qilish", callback_data="bekorx")]
-        ],row_width=2
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="bekorx")]
+        ],
+        row_width=2
     )
     
-    await call.message.edit_text("Iltimos, savol yoki taklifingizni yozing:",reply_markup=savekb)
-    
-    await SuggestionStates.waiting_for_suggestion.set()
-    
-
-@dp.callback_query_handler(lambda c: c.data == "bekorx",state="*")
-async def cancel_x(callback_query: types.CallbackQuery,state:FSMContext):
-    
-    kanalim = InlineKeyboardMarkup(
-             inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
-                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
-                [InlineKeyboardButton(
-                        text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    ),
-                    InlineKeyboardButton(
-                        text="🎲Random", callback_data="random")
-                        ],
-                [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
-            ],row_width=2
+    try:
+        await call.message.edit_text(
+            "🎬 Kino so'rash yoki taklif yuborish:\n\n"
+            "Iltimos, kinoning nomi yoki kodi bilan birga so'rovingizni yozing:",
+            reply_markup=savekb
         )
-   
-    await callback_query.message.edit_text("✍️ Kino kodini jonating. Bot kinoni tashlab beradi.",parse_mode="HTML",reply_markup=kanalim)
-    await state.finish()
-# Handle the user's suggestion and send it to the admin bot
-@dp.message_handler(state=SuggestionStates.waiting_for_suggestion)
+        await SuggestionStates.waiting_for_suggestion.set()
+    except Exception as e:
+        print(f"Error in ask_suggestion: {e}")
+        await call.answer("Xatolik yuz berdi, iltimos qaytadan urinib ko'ring.", show_alert=True)
+
+# Handle cancellation
+@dp.callback_query_handler(lambda c: c.data == "bekorx", state=SuggestionStates.waiting_for_suggestion)
+async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMContext):
+    kanalim = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
+             InlineKeyboardButton(text="🗒 Kategoriya", callback_data="name_search")],
+            [InlineKeyboardButton(text="🔍 Kino qidirish...", switch_inline_query_current_chat=""),
+             InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
+            [InlineKeyboardButton(text="🛒 Saqlanganlar", callback_data="kor_kino"),
+             InlineKeyboardButton(text="🎲 Random", callback_data="random")],
+            [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif", callback_data="send_suggestion_")]  
+        ],
+        row_width=2
+    )
+    
+    try:
+        await callback_query.message.edit_text(
+            "✍️ Kino kodini yuboring. Bot kinoni tashlab beradi.",
+            parse_mode="HTML",
+            reply_markup=kanalim
+        )
+        await state.finish()
+    except Exception as e:
+        print(f"Error in cancel_suggestion: {e}")
+        await callback_query.answer("Xatolik yuz berdi, iltimos qaytadan urinib ko'ring.", show_alert=True)
+
+# Handle the user's suggestion
+@dp.message_handler(state=SuggestionStates.waiting_for_suggestion, content_types=types.ContentTypes.TEXT)
 async def handle_suggestion(message: types.Message, state: FSMContext):
     botga = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔙Bo'tga o'tish", url="https://t.me/kinosaroyibot")]
-        ],row_width=2
+            [InlineKeyboardButton(text="🔙 Botga o'tish", url="https://t.me/kinosaroyibot"),
+             InlineKeyboardButton(text="Avtomatik javob", callback_data=f"autojavob:{message.from_user.id}")]
+        ],
+        row_width=2
     )
-    user_full = message.from_user.full_name
+    
     savekb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔙Bosh sahifa", callback_data="cancel")]
-        ],row_width=2
+            [InlineKeyboardButton(text="🔙 Bosh sahifa", callback_data="cancel")]
+        ],
+        row_width=2
     )
-    suggestion_text = message.text  # Get the user's suggestion
-     # Generate a random suggestion ID
-    user_id = message.from_user.id  # Get the user's user_id
+    
+    user_full = message.from_user.full_name
+    user_id = message.from_user.id
+    suggestion_text = message.text
 
-    # Send the suggestion to the admin bot
+    try:
+        # Send to admin channel with better formatting
+        await bot.send_message(
+            chat_id=CHANNEL_ID,
+            text=f"📩 *Yangi kino so'rovi*\n\n"
+                 f"👤 **Foydalanuvchi:** [{user_full}](tg://user?id={user_id})\n"
+                 f"🆔 **ID:** `{user_id}`\n"
+                 f"📝 **Xabar:**\n`{suggestion_text}`",
+            parse_mode="Markdown",
+            reply_markup=botga
+        )
+        
+        await message.answer(
+            "✅ Xabaringiz adminga yuborildi. Tez orada javob beriladi.\n\n"
+            "Agar kinoning kodini yuborgan bo'lsangiz, admin 'Avtomatik javob' tugmasi orqali "
+            "sizga kinoni yuborishi mumkin.",
+            reply_markup=savekb
+        )
+    except BotBlocked:
+        await message.answer("❌ Botni bloklagansiz. Iltimos, blokni olib tashlang.")
+    except Exception as e:
+        print(f"Error in handle_suggestion: {e}")
+        await message.answer("❌ Xatolik yuz berdi, iltimos qaytadan urinib ko'ring.")
+    
+    await state.finish()
+
+# Handle automatic response from admin
+@dp.callback_query_handler(lambda c: c.data.startswith("autojavob:"), state="*")
+async def send_auto_response(callback_query: types.CallbackQuery):
+    _, user_id = callback_query.data.split(":")
+    original_message = callback_query.message.text
+    
+    # Extract the suggestion text (simplified extraction)
+    suggestion_text = original_message.split("📝 **Xabar:**\n`")[1].split("`")[0]
+    
+    # Find numbers in the suggestion (potential movie codes)
+    numbers = [word for word in suggestion_text.split() if word.isdigit()]
+    
+    if numbers:
+        response_text = f"🎬 Kino kodi: {', '.join(numbers)}\n\nBotga shu kodni yuboring: /start {numbers[0]}"
+    else:
+        response_text = "✅ Sizning so'rovingiz qabul qilindi. Tez orada javob beramiz."
+    
     try:
         await bot.send_message(
-            chat_id=CHANNEL_ID,  # Send user_id to the channel
-            text=f"Foydalanuvchidan xabar\nID:``` {user_id} ```\nXabar:``` {suggestion_text} ```\nProfil\n[{user_full}](tg://user?id={user_id})",parse_mode="Markdown",reply_markup=botga
+            chat_id=user_id,
+            text=response_text
         )
-        await message.answer("Xabaringiz adminga yuborildi. ``` Javobni kuting... ```",parse_mode="Markdown",reply_markup=savekb)
-        await state.finish()
-    except BotBlocked:
-        await message.answer("Foydalanuvchi botni bloklagan.")
+        await callback_query.answer("✅ Javob foydalanuvchiga yuborildi!", show_alert=True)
+        
+        # Update the original message to show it's been responded to
+        await callback_query.message.edit_reply_markup(
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="✅ Javob berildi", callback_data="already_responded")]
+                ]
+            )
+        )
     except Exception as e:
-        print(f"Error: {e}")
-        await message.answer("Xatolik yuz berdi, iltimos qaytadan urinib ko‘ring.")
+        print(f"Error in send_auto_response: {e}")
+        await callback_query.answer("❌ Javob yuborishda xatolik!", show_alert=True)
+    
 
-    await state.finish()
+@dp.callback_query_handler(lambda c: c.data == "already_responded", state="*")
+async def already_responded(callback_query: types.CallbackQuery):
+    await callback_query.answer("Bu xabarga allaqachon javob berilgan", show_alert=True)
 
 # 
     
