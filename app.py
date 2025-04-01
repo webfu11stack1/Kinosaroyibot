@@ -1561,14 +1561,6 @@ async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMConte
 
 @dp.message_handler(state=SuggestionStates.waiting_for_suggestion, content_types=types.ContentTypes.TEXT)
 async def handle_suggestion(message: types.Message, state: FSMContext):
-    botga = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Botga o'tish", url="https://t.me/kinosaroyibot"),
-             InlineKeyboardButton(text="Avtomatik javob", callback_data=f"autojavob:{message.from_user.id}:{message.text}")]  # Bu yerga message.text qo'shildi
-        ],
-        row_width=2
-    )
-    
     savekb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔙 Bosh sahifa", callback_data="cancel")]
@@ -1590,24 +1582,70 @@ async def handle_suggestion(message: types.Message, state: FSMContext):
             break
 
     try:
-        # Admin kanaliga xabar yuborish
-        await bot.send_message(
-            chat_id=CHANNEL_ID,
-            text=f"📩 *Yangi kino so'rovi*\n\n"
-                 f"👤 **Foydalanuvchi:** [{user_full}](tg://user?id={user_id})\n"
-                 f"🆔 **ID:** `{user_id}`\n"
-                 f"📝 **Xabar:**\n`{suggestion_text}`\n\n"
-                 f"🔢 **Topilgan kod:** `{movie_code if movie_code else 'Topilmadi'}`",  # Bu qator qo'shildi
-            parse_mode="Markdown",
-            reply_markup=botga
-        )
-        
-        await message.answer(
-            "✅ Xabaringiz adminga yuborildi. Tez orada javob beriladi.\n\n"
-            "Agar kinoning kodini yuborgan bo'lsangiz, admin 'Avtomatik javob' tugmasi orqali "
-            "sizga kinoni yuborishi mumkin.",
-            reply_markup=savekb
-        )
+        if movie_code:
+            # Avtomatik javob yuboramiz
+            response_text = (
+                f"🎬 Siz yuborgan {movie_code} kodli kinoni ko'rish uchun quyidagi tugmani bosing:\n\n"
+                f"🔢 Kino kodi: {movie_code}"
+            )
+            
+            # Tugma yaratamiz
+            keyboard = InlineKeyboardMarkup()
+            keyboard.add(
+                InlineKeyboardButton(
+                    text="🎥 Kino ko'rish", 
+                    url=f"https://t.me/kinosaroyibot?start={movie_code}"
+                )
+            )
+            
+            # Foydalanuvchiga javob yuboramiz
+            await bot.send_message(
+                chat_id=user_id,
+                text=response_text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            
+            # Admin ga xabar beramiz (avtomatik javob yuborilganligi haqida)
+            await bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=f"📩 *Avtomatik javob yuborildi*\n\n"
+                     f"👤 Foydalanuvchi: [{user_full}](tg://user?id={user_id})\n"
+                     f"🆔 ID: `{user_id}`\n"
+                     f"🔢 Topilgan kod: `{movie_code}`\n"
+                     f"📝 Xabar: `{suggestion_text}`",
+                parse_mode="Markdown"
+            )
+            
+            await message.answer(
+                "✅ Sizning so'rovingiz qabul qilindi va avtomatik javob yuborildi.",
+                reply_markup=savekb
+            )
+        else:
+            # Agar kod topilmasa, admin ko'rib chiqadi
+            botga = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Botga o'tish", url="https://t.me/kinosaroyibot"),
+                     InlineKeyboardButton(text="Javob yozish", url=f"tg://user?id={user_id}")]
+                ],
+                row_width=2
+            )
+            
+            await bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=f"📩 *Yangi kino so'rovi (Avtomatik javob topilmadi)*\n\n"
+                     f"👤 Foydalanuvchi: [{user_full}](tg://user?id={user_id})\n"
+                     f"🆔 ID: `{user_id}`\n"
+                     f"📝 Xabar: `{suggestion_text}`",
+                parse_mode="Markdown",
+                reply_markup=botga
+            )
+            
+            await message.answer(
+                "✅ Xabaringiz adminga yuborildi. Tez orada javob beriladi.",
+                reply_markup=savekb
+            )
+            
     except BotBlocked:
         await message.answer("❌ Botni bloklagansiz. Iltimos, blokni olib tashlang.")
     except Exception as e:
