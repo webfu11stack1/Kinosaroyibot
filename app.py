@@ -738,7 +738,8 @@ async def statistika(message: types.Message, state: FSMContext):
 async def kanalb(message:types.Message,state:FSMContext):
     kanalsbolim = ReplyKeyboardMarkup(
         keyboard=[
-            ["📢Kanallar"],
+            ["📢Kanallar","➕Zayafka tugma"],
+            ["❌Zayafka o'chirish"],
             ["➕Kanal qo'shish","⛔️Kanal o'chirish"],
             ["🗄Bosh panel"]
         ],
@@ -1189,7 +1190,57 @@ async def export_db_command(message: types.Message, state: FSMContext):
     await state.finish()
 
 
+from aiogram import types
+from aiogram.dispatcher import FSMContext
 
+ZAYAF_KANAL = []
+
+@dp.message_handler(text="➕Zayafka tugma", state="*")
+async def zayaf(message: types.Message, state: FSMContext):
+    await message.answer("Zayafka tugma qo'shish uchun kanal linkini yuboring!")
+    await state.finish()
+    await state.set_state("zayaf_link")
+
+@dp.message_handler(content_types=["text"], state="zayaf_link")
+async def zayaf_n(message: types.Message, state: FSMContext):
+    zayaf_link = message.text.strip()
+    if not zayaf_link.startswith(('https://t.me/', '@')):
+        await message.answer("Iltimos, to'g'ri kanal linkini yuboring (https://t.me/... yoki @username)")
+        return
+    
+    ZAYAF_KANAL.append(zayaf_link)
+    await message.answer(f"Zayafka kanal qo'shildi! Jami zayafka kanallar: {len(ZAYAF_KANAL)}")
+    await state.finish()
+
+@dp.message_handler(text="❌Zayafka o'chirish", state="*")
+async def delete_zayaf_menu(message: types.Message):
+    if not ZAYAF_KANAL:
+        await message.answer("Hozircha zayafka kanallari mavjud emas!")
+        return
+    
+    keyboard = types.InlineKeyboardMarkup()
+    for i, link in enumerate(ZAYAF_KANAL, start=1):
+        keyboard.add(types.InlineKeyboardButton(
+            text=f"Zayafka {i} - {link[:20]}...", 
+            callback_data=f"delete_zayaf_{i-1}"
+        ))
+    
+    await message.answer("O'chirmoqchi bo'lgan zayafka kanalingizni tanlang:", reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('delete_zayaf_'))
+async def delete_zayaf_callback(callback_query: types.CallbackQuery):
+    index = int(callback_query.data.split('_')[-1])
+    
+    try:
+        deleted_link = ZAYAF_KANAL.pop(index)
+        await callback_query.message.edit_text(
+            f"Zayafka kanal o'chirildi: {deleted_link}\n"
+            f"Qolgan zayafka kanallar soni: {len(ZAYAF_KANAL)}"
+        )
+    except IndexError:
+        await callback_query.answer("Bu zayafka kanali allaqachon o'chirilgan", show_alert=True)
+    except Exception as e:
+        await callback_query.answer(f"Xatolik yuz berdi: {str(e)}", show_alert=True)
 
 
 @dp.message_handler(commands=["start"], state="*")
@@ -1248,13 +1299,14 @@ async def start(message: types.Message, state: FSMContext):
         if status.status == "left":
             unsubscribed_channels.append(channel_id)
 
-    if unsubscribed_channels:
-        # Agar obuna bo'lmagan kanallar bo'lsa
+    if unsubscribed_channels or (ZAYAF_KANAL and len(ZAYAF_KANAL) > 0):
         keyboard = InlineKeyboardMarkup(row_width=1)
-        
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://t.me/+4ooZMiT-lmozYzcy"))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 2",url="https://t.me/+AKiDSjJii4RiOTZi"))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 3",url="https://t.me/+jW8wguzNzCc2NGYy"))  
+        zayaf_start_num = len(ZAYAF_KANAL) + 1
+        for i, zayaf_url in enumerate(ZAYAF_KANAL, start=zayaf_start_num):
+            keyboard.add(InlineKeyboardButton(
+                text=f"➕ Obuna bo'lish {i}", 
+                url=zayaf_url
+            ))  
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 4",url="https://www.instagram.com/ar7.movie"))
         
         
