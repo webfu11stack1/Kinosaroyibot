@@ -1523,8 +1523,8 @@ async def ask_suggestion(call: types.CallbackQuery, state: FSMContext):
     
     try:
         await call.message.edit_text(
-            "🎬 Kino so'rash yoki taklif yuborish:\n\n"
-            "Iltimos, kinoning nomi yoki kodi bilan birga so'rovingizni yozing:",
+            "🎬 Kino so'rash :\n\n"
+            "Iltimos, Kerakli kino kodini yozing:",
             reply_markup=savekb
         )
         await SuggestionStates.waiting_for_suggestion.set()
