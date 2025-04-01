@@ -1213,61 +1213,47 @@ async def zayaf_n(message: types.Message, state: FSMContext):
     await state.finish()
 
 @dp.message_handler(text="❌Zayafka o'chirish", state="*")
-async def delete_zayaf_menu(message: types.Message):
+async def delete_zayaf_menu(message: types.Message, state: FSMContext):
     if not ZAYAF_KANAL:
         await message.answer("Hozircha zayafka kanallari mavjud emas!")
         return
     
-    keyboard = types.InlineKeyboardMarkup()
-    for i, link in enumerate(ZAYAF_KANAL, start=1):
-        keyboard.add(types.InlineKeyboardButton(
-            text=f"Zayafka {i} - {link[:20]}...", 
-            callback_data=f"delete_zayaf_{i-1}"
-        ))
-    
-    await message.answer("O'chirmoqchi bo'lgan zayafka kanalingizni tanlang:", reply_markup=keyboard)
+    # Kanal ro'yxatini chiqaramiz
+    kanal_list = "\n".join([f"{i+1}. {link}" for i, link in enumerate(ZAYAF_KANAL)])
+    await message.answer(
+        f"Zayafka kanallari ro'yxati:\n{kanal_list}\n\n"
+        "O'chirmoqchi bo'lgan kanal linkini yuboring yoki raqamini yozing:"
+    )
+    await state.set_state("delete_zayaf")
 
-@dp.callback_query_handler(lambda c: c.data.startswith('delete_zayaf_'))
-async def delete_zayaf_callback(callback_query: types.CallbackQuery):
-    try:
-        # Bosilganligini tasdiqlash
-        await callback_query.answer()
-        
-        # Indexni olish
-        index = int(callback_query.data.split('_')[2])
-        
-        # Indeksni tekshirish
-        if index < 0 or index >= len(ZAYAF_KANAL):
-            await callback_query.answer("Kanal topilmadi!", show_alert=True)
+@dp.message_handler(state="delete_zayaf")
+async def process_delete_zayaf(message: types.Message, state: FSMContext):
+    user_input = message.text.strip()
+    
+    # Raqam orqali o'chirish
+    if user_input.isdigit():
+        index = int(user_input) - 1
+        if 0 <= index < len(ZAYAF_KANAL):
+            deleted_link = ZAYAF_KANAL.pop(index)
+            await message.answer(
+                f"✅ Kanal o'chirildi:\n{deleted_link}\n"
+                f"Qolgan kanallar soni: {len(ZAYAF_KANAL)}"
+            )
+            await state.finish()
             return
-        
-        # Kanalni o'chirish
-        deleted_link = ZAYAF_KANAL.pop(index)
-        
-        # Yangi keyboard yaratish
-        keyboard = types.InlineKeyboardMarkup()
-        for i, link in enumerate(ZAYAF_KANAL, start=1):
-            keyboard.add(types.InlineKeyboardButton(
-                text=f"❌ Zayafka {i} - {link[:15]}...", 
-                callback_data=f"delete_zayaf_{i-1}"
-            ))
-        
-        # Xabarni yangilash
-        if ZAYAF_KANAL:
-            await callback_query.message.edit_text(
-                f"✅ Kanal o'chirildi: {deleted_link}\n"
-                f"Qolgan kanallar: {len(ZAYAF_KANAL)}",
-                reply_markup=keyboard
-            )
-        else:
-            await callback_query.message.edit_text(
-                "✅ Barcha zayafka kanallari o'chirildi!\n"
-                "Ro'yxat bo'sh"
-            )
-            
-    except Exception as e:
-        print(f"Xato: {e}")
-        await callback_query.answer("Xatolik yuz berdi!", show_alert=True)
+    
+    # Link orqali o'chirish
+    if user_input in ZAYAF_KANAL:
+        ZAYAF_KANAL.remove(user_input)
+        await message.answer(
+            f"✅ Kanal o'chirildi:\n{user_input}\n"
+            f"Qolgan kanallar soni: {len(ZAYAF_KANAL)}"
+        )
+    else:
+        await message.answer("❌ Noto'g'ri raqam yoki link kiritildi! Qaytadan urinib ko'ring:")
+        return
+    
+    await state.finish()
 
 
 @dp.message_handler(commands=["start"], state="*")
