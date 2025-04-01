@@ -1824,13 +1824,19 @@ async def check_movie_code(msg: Message, state: FSMContext):
             unsubscribed_channels.append(channel_id)
 
     if unsubscribed_channels:
-        # Obuna bo'lmagan kanallar uchun tugmalarni yaratish
         keyboard = InlineKeyboardMarkup(row_width=1)
+        for zayaf_url in ZAYAF_KANAL:
+            keyboard.add(InlineKeyboardButton(
+                text="➕ Obuna bo'lish", 
+                url=zayaf_url
+            ))  
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 4",url="https://www.instagram.com/ar7.movie"))
+        
+        
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url="https://t.me/+A5LLnZkzdOQ3NDdi"))
-        keyboard.add(InlineKeyboardButton(text="Instagram Sahifamiz",url="https://www.instagram.com/ar7.movie"))
-        keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True"))
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 5", url=channel_url))  
+        
+        keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
 
         await msg.reply(
             "``` Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:```⬇️",
