@@ -1613,30 +1613,32 @@ async def send_auto_response(callback_query: types.CallbackQuery):
         # Foydalanuvchi ID sini olamiz
         _, user_id = callback_query.data.split(":")
         
-        # Foydalanuvchi yuborgan ASL xabarni olamiz
+        # Admin xabaridan foydalanuvchi yuborgan asl xabarni olamiz
         if not callback_query.message.reply_to_message:
             await callback_query.answer("❌ Xabarni topib bo'lmadi!", show_alert=True)
             return
             
+        # Foydalanuvchi yuborgan asl xabar matni
         original_message = callback_query.message.reply_to_message.text or callback_query.message.reply_to_message.caption or ""
-
-        # Xabardan barcha raqamlarni ajratib olamiz
+        
+        # Xabardan raqamni qidirish
         movie_code = None
+        # Avval xabardan raqam qismini ajratib olish
         for word in original_message.split():
             # Faqat raqamlarni ajratib olamiz
             digits = ''.join(filter(str.isdigit, word))
-            if digits:  # 1 yoki undan ortiq raqam bo'lsa
+            if digits:  # Agar raqam topilsa
                 movie_code = digits
                 break
-
+        
         if movie_code:
-            # Javob matnini tayyorlaymiz
+            # Javob matnini tayyorlaymiz (foydalanuvchi yuborgan raqam bilan)
             response_text = (
                 f"🎬 Siz yuborgan {movie_code} kodli kinoni ko'rish uchun quyidagi tugmani bosing:\n\n"
                 f"🔢 Kino kodi: {movie_code}"
             )
             
-            # Tugma yaratamiz
+            # Tugma yaratamiz (foydalanuvchi yuborgan raqam bilan havola)
             keyboard = InlineKeyboardMarkup()
             keyboard.add(
                 InlineKeyboardButton(
@@ -1653,7 +1655,8 @@ async def send_auto_response(callback_query: types.CallbackQuery):
             await bot.send_message(
                 chat_id=user_id,
                 text=response_text,
-                reply_markup=keyboard
+                reply_markup=keyboard,
+                parse_mode="HTML"
             )
             
             # Admin ga xabar beramiz
@@ -1675,7 +1678,7 @@ async def send_auto_response(callback_query: types.CallbackQuery):
     except Exception as e:
         print(f"Xatolik: {e}")
         await callback_query.answer("❌ Xatolik yuz berdi!", show_alert=True)
-
+        
 @dp.callback_query_handler(lambda c: c.data == "already_responded", state="*")
 async def already_responded(callback_query: types.CallbackQuery):
     await callback_query.answer("Bu xabarga allaqachon javob berilgan", show_alert=True)
