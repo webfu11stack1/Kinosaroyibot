@@ -2136,7 +2136,7 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
             ],row_width=2
         )
    
-    await callback_query.message.edit_text("Kino kerakmi? \n<i>Kerakli kino kodini, nomini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!</i>",parse_mode="HTML",reply_markup=kanalim)
+    await callback_query.message.edit_text("Kino kerakmi? \n<i>Kino kodini botga jonating!</i>",parse_mode="HTML",reply_markup=kanalim)
     await state.finish()
 
 
@@ -2335,7 +2335,7 @@ async def b_can(calb:types.CallbackQuery,state:FSMContext):
             ],row_width=2
         )
    
-    await calb.message.answer("Kino kerakmi? \n<i>Kerakli kino kodini, nomini kiriting yoki Qidirish tugmasi orqali kinolarni qidiring!</i>",parse_mode="HTML",reply_markup=kanalim)
+    await calb.message.answer("Kino kerakmi? \n<i>Kino kodini botga jonating!</i>",parse_mode="HTML",reply_markup=kanalim)
     await state.finish()
 
 
