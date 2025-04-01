@@ -1299,7 +1299,7 @@ async def start(message: types.Message, state: FSMContext):
         if status.status == "left":
             unsubscribed_channels.append(channel_id)
 
-    if unsubscribed_channels or (ZAYAF_KANAL and len(ZAYAF_KANAL) > 0):
+    if unsubscribed_channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
         zayaf_start_num = len(ZAYAF_KANAL) + 1
         for i, zayaf_url in enumerate(ZAYAF_KANAL, start=zayaf_start_num):
