@@ -1229,18 +1229,45 @@ async def delete_zayaf_menu(message: types.Message):
 
 @dp.callback_query_handler(lambda c: c.data.startswith('delete_zayaf_'))
 async def delete_zayaf_callback(callback_query: types.CallbackQuery):
-    index = int(callback_query.data.split('_')[-1])
-    
     try:
+        # Bosilganligini tasdiqlash
+        await callback_query.answer()
+        
+        # Indexni olish
+        index = int(callback_query.data.split('_')[2])
+        
+        # Indeksni tekshirish
+        if index < 0 or index >= len(ZAYAF_KANAL):
+            await callback_query.answer("Kanal topilmadi!", show_alert=True)
+            return
+        
+        # Kanalni o'chirish
         deleted_link = ZAYAF_KANAL.pop(index)
-        await callback_query.message.edit_text(
-            f"Zayafka kanal o'chirildi: {deleted_link}\n"
-            f"Qolgan zayafka kanallar soni: {len(ZAYAF_KANAL)}"
-        )
-    except IndexError:
-        await callback_query.answer("Bu zayafka kanali allaqachon o'chirilgan", show_alert=True)
+        
+        # Yangi keyboard yaratish
+        keyboard = types.InlineKeyboardMarkup()
+        for i, link in enumerate(ZAYAF_KANAL, start=1):
+            keyboard.add(types.InlineKeyboardButton(
+                text=f"❌ Zayafka {i} - {link[:15]}...", 
+                callback_data=f"delete_zayaf_{i-1}"
+            ))
+        
+        # Xabarni yangilash
+        if ZAYAF_KANAL:
+            await callback_query.message.edit_text(
+                f"✅ Kanal o'chirildi: {deleted_link}\n"
+                f"Qolgan kanallar: {len(ZAYAF_KANAL)}",
+                reply_markup=keyboard
+            )
+        else:
+            await callback_query.message.edit_text(
+                "✅ Barcha zayafka kanallari o'chirildi!\n"
+                "Ro'yxat bo'sh"
+            )
+            
     except Exception as e:
-        await callback_query.answer(f"Xatolik yuz berdi: {str(e)}", show_alert=True)
+        print(f"Xato: {e}")
+        await callback_query.answer("Xatolik yuz berdi!", show_alert=True)
 
 
 @dp.message_handler(commands=["start"], state="*")
