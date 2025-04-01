@@ -1254,12 +1254,12 @@ async def start(message: types.Message, state: FSMContext):
         
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://t.me/+4ooZMiT-lmozYzcy"))
         
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 3",url="https://t.me/+jW8wguzNzCc2NGYy"))  
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 4",url="https://www.instagram.com/ar7.movie"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 2",url="https://t.me/+jW8wguzNzCc2NGYy"))  
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 3",url="https://www.instagram.com/ar7.movie"))
         
         
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 5", url=channel_url))  
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 4", url=channel_url))  
         
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
