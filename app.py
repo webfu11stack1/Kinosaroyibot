@@ -1559,13 +1559,12 @@ async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMConte
         print(f"Error in cancel_suggestion: {e}")
         await callback_query.answer("Xatolik yuz berdi, iltimos qaytadan urinib ko'ring.", show_alert=True)
 
-# Handle the user's suggestion
 @dp.message_handler(state=SuggestionStates.waiting_for_suggestion, content_types=types.ContentTypes.TEXT)
 async def handle_suggestion(message: types.Message, state: FSMContext):
     botga = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔙 Botga o'tish", url="https://t.me/kinosaroyibot"),
-             InlineKeyboardButton(text="Avtomatik javob", callback_data=f"autojavob:{message.from_user.id}")]
+             InlineKeyboardButton(text="Avtomatik javob", callback_data=f"autojavob:{message.from_user.id}:{message.text}")]  # Bu yerga message.text qo'shildi
         ],
         row_width=2
     )
@@ -1581,14 +1580,24 @@ async def handle_suggestion(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     suggestion_text = message.text
 
+    # Xabardan raqamni ajratib olish
+    movie_code = None
+    for word in suggestion_text.split():
+        # Faqat raqamlarni ajratib olamiz
+        digits = ''.join(filter(str.isdigit, word))
+        if digits:  # Agar raqam topilsa
+            movie_code = digits
+            break
+
     try:
-        # Send to admin channel with better formatting
+        # Admin kanaliga xabar yuborish
         await bot.send_message(
             chat_id=CHANNEL_ID,
             text=f"📩 *Yangi kino so'rovi*\n\n"
                  f"👤 **Foydalanuvchi:** [{user_full}](tg://user?id={user_id})\n"
                  f"🆔 **ID:** `{user_id}`\n"
-                 f"📝 **Xabar:**\n`{suggestion_text}`",
+                 f"📝 **Xabar:**\n`{suggestion_text}`\n\n"
+                 f"🔢 **Topilgan kod:** `{movie_code if movie_code else 'Topilmadi'}`",  # Bu qator qo'shildi
             parse_mode="Markdown",
             reply_markup=botga
         )
@@ -1610,35 +1619,32 @@ async def handle_suggestion(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data.startswith("autojavob:"), state="*")
 async def send_auto_response(callback_query: types.CallbackQuery):
     try:
-        # Foydalanuvchi ID sini olamiz
-        _, user_id = callback_query.data.split(":")
-        
-        # Admin xabaridan foydalanuvchi yuborgan asl xabarni olamiz
-        if not callback_query.message.reply_to_message:
-            await callback_query.answer("❌ Xabarni topib bo'lmadi!", show_alert=True)
+        # Callback datani ajratib olamiz: user_id:message_text
+        parts = callback_query.data.split(":")
+        if len(parts) < 3:
+            await callback_query.answer("❌ Xatolik: Noto'g'ri format!", show_alert=True)
             return
             
-        # Foydalanuvchi yuborgan asl xabar matni
-        original_message = callback_query.message.reply_to_message.text or callback_query.message.reply_to_message.caption or ""
+        user_id = parts[1]
+        original_message = ":".join(parts[2:])  # Qolgan qismini birlashtiramiz
         
-        # Xabardan raqamni qidirish
+        # Xabardan raqamni ajratib olish
         movie_code = None
-        # Avval xabardan raqam qismini ajratib olish
         for word in original_message.split():
             # Faqat raqamlarni ajratib olamiz
             digits = ''.join(filter(str.isdigit, word))
             if digits:  # Agar raqam topilsa
                 movie_code = digits
                 break
-        
+
         if movie_code:
-            # Javob matnini tayyorlaymiz (foydalanuvchi yuborgan raqam bilan)
+            # Javob matnini tayyorlaymiz
             response_text = (
                 f"🎬 Siz yuborgan {movie_code} kodli kinoni ko'rish uchun quyidagi tugmani bosing:\n\n"
                 f"🔢 Kino kodi: {movie_code}"
             )
             
-            # Tugma yaratamiz (foydalanuvchi yuborgan raqam bilan havola)
+            # Tugma yaratamiz
             keyboard = InlineKeyboardMarkup()
             keyboard.add(
                 InlineKeyboardButton(
