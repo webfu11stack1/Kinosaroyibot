@@ -1314,7 +1314,8 @@ async def start(message: types.Message, state: FSMContext):
 
     if unsubscribed_channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/abu.movies"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/ar7.movie"))
         for zayaf_url in ZAYAF_KANAL:
             keyboard.add(InlineKeyboardButton(
                 text="➕ Obuna bo'lish", 
@@ -1839,6 +1840,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
 
     if unsubscribed_channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/abu.movies"))
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
         for zayaf_url in ZAYAF_KANAL:
             keyboard.add(InlineKeyboardButton(
