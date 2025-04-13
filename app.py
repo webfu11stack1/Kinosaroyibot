@@ -1325,7 +1325,7 @@ async def start(message: types.Message, state: FSMContext):
         
         
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ", url=channel_url))  
         
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
@@ -1851,7 +1851,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
         
         
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ", url=channel_url))  
         
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
 
