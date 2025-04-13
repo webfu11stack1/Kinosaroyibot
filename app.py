@@ -1322,7 +1322,7 @@ async def start(message: types.Message, state: FSMContext):
                 url=zayaf_url
             ))  
         
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/kinosaroyibot"))
+        
         
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
@@ -1848,7 +1848,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
                 url=zayaf_url
             ))  
         
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/kinosaroyibot"))
+        
         
         for _, channel_url in channels:
             keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
