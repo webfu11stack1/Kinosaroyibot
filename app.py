@@ -1314,18 +1314,18 @@ async def start(message: types.Message, state: FSMContext):
 
     if unsubscribed_channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/abu.movies"))
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/ar7.movie"))
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
+        
         for zayaf_url in ZAYAF_KANAL:
             keyboard.add(InlineKeyboardButton(
                 text="➕ Obuna bo'lish", 
                 url=zayaf_url
             ))  
         
-        
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/kinosaroyibot"))
         
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 5", url=channel_url))  
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
         
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
@@ -1840,7 +1840,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
 
     if unsubscribed_channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/abu.movies"))
+        
         keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
         for zayaf_url in ZAYAF_KANAL:
             keyboard.add(InlineKeyboardButton(
@@ -1848,10 +1848,10 @@ async def check_movie_code(msg: Message, state: FSMContext):
                 url=zayaf_url
             ))  
         
-        
+        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ",url="https://www.instagram.com/kinosaroyibot"))
         
         for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 5", url=channel_url))  
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 6", url=channel_url))  
         
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
 
