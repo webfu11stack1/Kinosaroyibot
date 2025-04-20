@@ -1388,7 +1388,7 @@ async def start(message: types.Message, state: FSMContext):
         # Obunadan o'tganlar uchun asosiy menyu
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
@@ -1603,7 +1603,7 @@ async def ask_suggestion(call: types.CallbackQuery, state: FSMContext):
 async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMContext):
     kanalim = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
+            [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
              InlineKeyboardButton(text="🗒 Kategoriya", callback_data="name_search")],
             [InlineKeyboardButton(text="🔍 Kino qidirish...", switch_inline_query_current_chat=""),
              InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
@@ -1974,7 +1974,7 @@ async def backs(calmes:types.CallbackQuery):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
@@ -2234,7 +2234,7 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
+                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
@@ -2247,209 +2247,21 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
                 [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
             ],row_width=2
         )
-   
+    InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")
     await callback_query.message.edit_text("Kino kerakmi? \n<i>Kino kodini botga jonating!</i>",parse_mode="HTML",reply_markup=kanalim)
     await state.finish()
 
 
-    
-import logging
-import requests
-from bs4 import BeautifulSoup
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils import executor
-from difflib import get_close_matches
-
-CATEGORY_URLS = {
-    "tarjima_2025": "https://uzmove.tv/tarjima-kinolar-2025/page/{}/",
-    "tarjima_2024": "https://uzmove.tv/tarjima-kinolar-2024/page/{}/",
-    "jangari": "https://uzmove.tv/jangari-kinolar/page/{}/",
-    "hind": "https://uzmove.tv/hind-kino-uzbek-tilida/page/{}/",
-    "ujas": "https://uzmove.tv/ujas-kinolar-ozbek-tilida/page/{}/",
-    "tarjima": "https://uzmove.tv/tarjima-kino/page/{}/"  # Yangi kategoriya
-}
-
-user_categories = {}
-
-def category_keyboard():
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        InlineKeyboardButton("🎬 Tarjima 2025 🔍 ", callback_data="category_tarjima_2025"),
-        InlineKeyboardButton("🎬 Tarjima 2024 🔍", callback_data="category_tarjima_2024"),
-        InlineKeyboardButton("🎭 Hind 🔍", callback_data="category_hind"),  
-        InlineKeyboardButton("🌍 Tarjima (Umumiy) 🔍", callback_data="category_tarjima"),  # Yangi tugma
-        InlineKeyboardButton("🔍 Umumiy qidirish", callback_data="category_all")
-    ]
-    keyboard.add(*buttons)
-    return keyboard
-
-def scrape_movies(query, categories):
-    query = query.lower().replace(" ", "")
-    all_movies = []
-    
-    for category in categories:
-        base_url = CATEGORY_URLS.get(category, "")
-        if not base_url:
-            continue
-
-        page = 1
-        while True:  # Barcha sahifalarni qidirish
-            url = base_url.format(page)
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers)
-            
-            # Agar sahifa mavjud bo'lmasa (404 yoki boshqa xato)
-            if response.status_code != 200:
-                break  # Aylanishni to'xtatish
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            movies = soup.find_all("div", class_="item-main__header")
-            
-            # Agar sahifada kinolar bo'lmasa
-            if not movies:
-                break  # Aylanishni to'xtatish
-
-            # Har bir kino ma'lumotlarini olish
-            for movie in movies:
-                title_tag = movie.find("a", class_="item-main__title")
-                poster_tag = movie.find_next("div", class_="item-main__poster").find("img")
-
-                if title_tag and poster_tag:
-                    original_title = title_tag.text.strip()
-                    normalized_title = original_title.lower().replace(" ", "")
-                    link = title_tag["href"]
-                    poster_url = poster_tag["src"] if "http" in poster_tag["src"] else "https://uzmove.tv" + poster_tag["src"]
-
-                    all_movies.append((normalized_title, original_title, link, poster_url))
-                    
-                    # Agar birinchi moslik topilsa, qidiruvni to'xtatish
-                    if query in normalized_title:
-                        download_link = get_movie_link(link)
-                        if download_link:
-                            return [(original_title, download_link, poster_url)]
-            
-            page += 1  # Keyingi sahifaga o'tish
-    
-    # Agar birinchi moslik topilmasa, eng yaqin mosliklarni qidirish
-    closest_matches = get_close_matches(query, [t[0] for t in all_movies], n=5, cutoff=0.3)
-    
-    if closest_matches:
-        suggestions = []
-        for match in closest_matches:
-            for full_title, original_title, link, poster_url in all_movies:
-                if match == full_title:
-                    download_link = get_movie_link(link)
-                    if download_link:
-                        suggestions.append((original_title, download_link, poster_url))
-        
-        return suggestions if suggestions else None
-    
-    # Agar birinchi uchta harf mos kelmasa, boshqa variantlarni ham ko'rsatish
-    first_three_letters = query[:3]
-    similar_movies = []
-    for full_title, original_title, link, poster_url in all_movies:
-        if full_title.startswith(first_three_letters):
-            download_link = get_movie_link(link)
-            if download_link:
-                similar_movies.append((original_title, download_link, poster_url))
-    
-    return similar_movies if similar_movies else None
-
-def get_movie_link(movie_page_url):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(movie_page_url, headers=headers)
-    
-    if response.status_code != 200:
-        return ""
-    
-    soup = BeautifulSoup(response.text, "html.parser")
-    script_tags = soup.find_all("script")
-    
-    for script in script_tags:
-        if "Playerjs" in script.text:
-            start = script.text.find('file:"') + 6
-            end = script.text.find('"', start)
-            video_url = script.text[start:end]
-            
-            if video_url.startswith("https://sdd2025.top/") or video_url.startswith("https://baza2025.top/"):
-                return video_url
-    
-    return ""
-
-@dp.callback_query_handler(lambda d:d.data=="name_search",state="*")
-async def start(calbakm: types.CallbackQuery,state:FSMContext):
-    user_id = calbakm.from_user.id
-    user_categories[user_id] = None
-    await calbakm.message.answer("🎬 Kategoriyani tanlang:", reply_markup=category_keyboard())
-
-@dp.callback_query_handler(lambda call: call.data.startswith("category_"),state="*")
-async def category_selected(call: types.CallbackQuery,state:FSMContext):
-    user_id = call.from_user.id
-    category = call.data.split("_", 1)[1]
-    
-    if category == "all":
-        user_categories[user_id] = list(CATEGORY_URLS.keys())
-    else:
-        user_categories[user_id] = [category]
-    
-    await call.message.edit_text(
-        f"✅ {call.message.chat.first_name}, siz **{category.replace('_', ' ').capitalize()}** kategoriyasini tanladingiz!\n\n🎬 Kino nomini yozing:"
-    )
-
-    await state.set_state("cat_tanla")
-
-@dp.message_handler(state="cat_tanla")
-async def search_movie(message: types.Message):
-    user_id = message.from_user.id
-    categories = user_categories.get(user_id)
-
-    
-    user_query = message.text.strip()
-    waiting_message = await message.answer("⏳ Kino yuklanmoqda, kutib turing...")
-    
-    results = scrape_movies(user_query, categories)
-    await bot.delete_message(message.chat.id, waiting_message.message_id)
-    
-    if results:
-        if len(results) == 1:
-            title, download_link, poster_url = results[0]
-            text = f"🎥 {title}\n\n⬇️ Yuklab olish uchun tugmani bosing."
-            keyboard = InlineKeyboardMarkup().add(InlineKeyboardButton("⬇️ Yuklab olish", url=download_link))
-            keyboard.add(InlineKeyboardButton(text="🔙Bosh sahifa", callback_data="b_cancel"))
-            await message.answer_photo(photo=poster_url, caption=text, reply_markup=keyboard)
-        else:
-            text = "❗ Siz qidirgan kinoga o‘xshash natijalar topildi:\n\n"
-            keyboard = InlineKeyboardMarkup()
-            for title, link, poster_url in results:
-                keyboard.add(InlineKeyboardButton(f"🎬 {title}", url=link))
-            await message.answer(text, reply_markup=keyboard)
-    else:
-
-        await message.answer("❌ Kino topilmadi. Iltimos, to‘g‘ri yozganingizga ishonch hosil qiling yoki boshqa nom bilan urinib ko‘ring.\n\n 🎬Kategoriyalar: <i>(Umumiy qidirish bosing)</i> ",reply_markup=category_keyboard(),parse_mode="HTML")
-
-
-@dp.callback_query_handler(lambda f:f.data=="b_cancel",state="*")
-async def b_can(calb:types.CallbackQuery,state:FSMContext):
-    kanalim = InlineKeyboardMarkup(
-             inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", url="https://t.me/ar7movie"),
-                 InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
-                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
-                [InlineKeyboardButton(
-                        text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    ),
-                    InlineKeyboardButton(
-                        text="🎲Random", callback_data="random")
-                        ],
-                [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
-            ],row_width=2
-        )
-   
-    await calb.message.answer("Kino kerakmi? \n<i>Kino kodini botga jonating!</i>",parse_mode="HTML",reply_markup=kanalim)
+@dp.callback_query_handler(lambda c: c.data == 'name_search',state="*")
+async def kodlik_callback(call: types.CallbackQuery,state:FSMContext):
+    await call.answer("❌ Hozirda bu bo'lim mavjud emas! Kino kerak bo‘lsa, botga kodini jo‘nating!", show_alert=True)
     await state.finish()
 
+
+@dp.callback_query_handler(lambda c: c.data == 'kodlik',state="*")
+async def kodlik_callback(call: types.CallbackQuery,state:FSMContext):
+    await call.answer("🎬 Kino kerak bo‘lsa, botga kodini jo‘nating!", show_alert=True)
+    await state.finish()
 
 # Dasturni ishga tushurish
 if __name__ == '__main__':
