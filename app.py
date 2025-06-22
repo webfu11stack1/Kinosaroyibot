@@ -312,63 +312,66 @@ async def inline_query_handler(query: types.InlineQuery):
         next_offset=next_offset  # Keyingi sahifani ko'rsatish
     )
 
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+import sqlite3
 
-@dp.message_handler(text="⛔️Kino o'chirish", state="*")
-async def dekkino(message: types.Message, state: FSMContext):
-    await message.answer("Kino o'chirish uchun kodini yuboring!")
-    await state.set_state("dkino")
-
-
-@dp.message_handler(state="dkino")
-async def dkin(message: types.Message, state: FSMContext):
-    dk = message.text
-    dkk = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Yes", callback_data="yes"),
-             InlineKeyboardButton(text="No", callback_data="no")]
-        ], row_width=2
-    )
-    await state.update_data(dk=dk)  # Store dk in the FSMContext
-    await message.answer(f"{dk} kodli kino o'chirilsinmi!", reply_markup=dkk)
-    await state.set_state("kodo")
+# Holatlar
+class DeleteChannelState(StatesGroup):
+    choosing = State()
+    confirm = State()
 
 
-@dp.callback_query_handler(lambda d: d.data == "yes", state="kodo")
-async def yesdel(calmes: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    dk = data.get("dk")  # Retrieve dk (movie_code) from the state
-    
-    if dk and dk.isdigit():
-        conn = sqlite3.connect("kinosaroy1bot.db")
-        cursor = conn.cursor()
+# 1. Kanal o‘chirish tugmasi bosilganda
+@dp.message_handler(text="⛔️Kanal o'chirish", state="*")
+async def show_channel_list(message: types.Message, state: FSMContext):
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT channel_id, channel_url FROM channel")
+    channels = cursor.fetchall()
+    conn.close()
 
-        # Delete the movie record from the 'movies' table using the movie_code (dk)
-        cursor.execute("DELETE FROM movies WHERE movie_code = ?", (dk,))
-        conn.commit()
-        conn.close()
+    if not channels:
+        await message.answer("❌ Bazada hozircha hech qanday kanal yo‘q.")
+        return
 
-        # Use calmes.answer() to show an alert
-        await calmes.answer(f"{dk} kodli kino o'chirildi!✅", show_alert=True)
-    else:
-        await calmes.answer("Raqam kiriting!", show_alert=True)
+    kanal_text = "🗑 O‘chirmoqchi bo‘lgan kanal raqamini yuboring:\n\n"
+    kanal_dict = {}
 
+    for index, (chan_id, chan_url) in enumerate(channels, start=1):
+        kanal_text += f"{index}) {chan_url}\n"
+        kanal_dict[str(index)] = (chan_id, chan_url)
+
+    await state.update_data(kanal_dict=kanal_dict)
+    await message.answer(kanal_text)
+    await state.set_state(DeleteChannelState.choosing)
+
+
+# 2. Foydalanuvchi raqam yuboradi
+@dp.message_handler(state=DeleteChannelState.choosing, content_types=types.ContentTypes.TEXT)
+async def delete_selected_channel(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    kanal_dict = user_data.get("kanal_dict", {})
+
+    choice = message.text.strip()
+
+    if choice not in kanal_dict:
+        await message.answer("❌ Noto‘g‘ri raqam. Iltimos, ro‘yxatdagi raqamdan birini yuboring.")
+        return
+
+    kanal_id, kanal_url = kanal_dict[choice]
+
+    # Bazadan o‘chirish
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM channel WHERE channel_id=? AND channel_url=?", (kanal_id, kanal_url))
+    conn.commit()
+    conn.close()
+
+    await message.answer(f"✅ Kanal o‘chirildi:\n{kanal_url}")
     await state.finish()
 
 
-
-
-@dp.callback_query_handler(lambda d: d.data == "no", state="*")
-async def nodel(calmes: types.CallbackQuery, state: FSMContext):
-    await calmes.message.answer("⛔️ O'chirish bekor qilindi.")
-    await state.finish()
-
-
-
-    
-@dp.callback_query_handler(lambda d:d.data=="end1",state="next1")
-async def end(cal:types.CallbackQuery,state:FSMContext):
-    await state.finish()
-    await panel(cal.message,state)
 
 @dp.message_handler(text="⚪️Xabarlar bo'limi",state="*")
 async def xabarbolim(message:types.Message,state:FSMContext):
