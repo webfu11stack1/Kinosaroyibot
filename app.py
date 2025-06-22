@@ -831,52 +831,79 @@ async def cancel_addition(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("Amal bekor qilindi.")
     await state.finish()
 
-#Kanal o'chirish
-@dp.message_handler(text="⛔️Kanal o'chirish",state="*")
-async def kanal_del(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
+@dp.message_handler(text="⛔️Kanal o'chirish", state="*")
+async def kanal_ochirish_menu(message: types.Message, state: FSMContext):
+    admin_id = message.from_user.id
+    if admin_id not in [1996936737]:  # <- bu yerga o'zingizning admin Telegram ID’laringizni yozing
+        await message.answer("⛔️ Sizda bu amalni bajarish huquqi yo‘q.")
+        return
+
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT channel_id, channel_url FROM channel")
+    kanallar = cursor.fetchall()
+    conn.close()
+
+    if not kanallar:
+        await message.answer("📭 Bazada hozircha hech qanday kanal yo‘q.")
+        return
+
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    for kanal_id, kanal_url in kanallar:
+        keyboard.insert(
+            InlineKeyboardButton(
+                text=kanal_url,
+                callback_data=f"delconfirm_{kanal_id}|{kanal_url}"
+            )
+        )
+
+    await message.answer("O'chirmoqchi bo'lgan kanalni tanlang:", reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data.startswith("delconfirm_"))
+async def confirm_delete_channel(call: CallbackQuery, state: FSMContext):
+    _, kanal_data = call.data.split("_", 1)
+    kanal_id, kanal_url = kanal_data.split("|", 1)
+
+    # saqlab qo‘yamiz tasdiq uchun
+    await state.update_data(kanal_id=kanal_id, kanal_url=kanal_url)
+
+    keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
+            [
+                InlineKeyboardButton("✅ Ha, o'chir", callback_data="confirm_delete"),
+                InlineKeyboardButton("❌ Yo'q", callback_data="cancel_delete")
+            ]
+        ]
     )
-    await message.answer("Kanal idsini yuboring!",reply_markup=tugatish)
+
+    await call.message.edit_text(
+        f"⚠️ Siz rostdan ham quyidagi kanalni o‘chirmoqchimisiz?\n\n"
+        f"🆔 ID: `{kanal_id}`\n🔗 URL: {kanal_url}",
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+
+@dp.callback_query_handler(lambda c: c.data == "confirm_delete", state="*")
+async def really_delete(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    kanal_id = data.get("kanal_id")
+    kanal_url = data.get("kanal_url")
+
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM channel WHERE channel_id=? AND channel_url=?", (kanal_id, kanal_url))
+    conn.commit()
+    conn.close()
+
     await state.finish()
-    await state.set_state("kanal_del")
+    await call.message.edit_text(f"✅ Kanal o‘chirildi:\n🆔 `{kanal_id}`\n🔗 {kanal_url}", parse_mode="Markdown")
+    await state.finish()
 
-@dp.message_handler(state="kanal_del")
-async def kanal_idel(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global kanal_iddel;
-    kanal_iddel = (message.text)
-    if kanal_iddel.startswith('-100'):
-        await message.answer("Kanal url yuboring !",reply_markup=tugatish)
-        await state.finish()
-        await state.set_state("kanal_urld")
-    else:
-        await message.answer("Idda xatolik")    
-        
-        
-@dp.message_handler(state="kanal_urld")
-async def kanal_urldel(message:types.Message,state:FSMContext):
-    global kanal_urlldel;
-    kanal_urlldel = message.text
-    if  kanal_urlldel.startswith("https:"):
-        conn = sqlite3.connect('kinosaroy1bot.db')
-        cursor = conn.cursor()
-        try:
-            cursor.execute("DELETE FROM channel WHERE channel_id=? AND channel_url=?", (kanal_iddel,kanal_urlldel))
-            conn.commit()
-            await message.answer("Kanal o'chirildi!")
-            await state.finish()
-        except:
-            await message.answer("Bunday kanal yoki url topilmadi!")
-    else:
-        await message.answer("Kanal urlda xatolik!")
-
+@dp.callback_query_handler(lambda c: c.data == "cancel_delete", state="*")
+async def cancel_delete_channel(call: CallbackQuery, state: FSMContext):
+    await state.finish()
+    await call.message.edit_text("❌ O‘chirish bekor qilindi.")
+    await state.finish()
 
 #Inine Xabar 
         
@@ -937,6 +964,7 @@ async def inline_name(message:types.Message,state:FSMContext):
 
 @dp.callback_query_handler(lambda d:d.data=="send",state="*")
 async def send_inline(query:types.CallbackQuery,state:FSMContext):
+    await query.message.answer("Xabar yuborilmoqda...")
     yetkazilganlarr=0
     yetkazilmaganlar=0
     inline = InlineKeyboardMarkup(
@@ -1204,13 +1232,21 @@ async def zayaf(message: types.Message, state: FSMContext):
 @dp.message_handler(content_types=["text"], state="zayaf_link")
 async def zayaf_n(message: types.Message, state: FSMContext):
     zayaf_link = message.text.strip()
-    if not zayaf_link.startswith(('https://t.me/', '@')):
-        await message.answer("Iltimos, to'g'ri kanal linkini yuboring (https://t.me/... yoki @username)")
-        return
-    
-    ZAYAF_KANAL.append(zayaf_link)
-    await message.answer(f"Zayafka kanal qo'shildi! Jami zayafka kanallar: {len(ZAYAF_KANAL)}")
-    await state.finish()
+
+    if zayaf_link.startswith(('https://t.me/', '@', 'https://instagram.com/', 'https://www.instagram.com/')):
+        ZAYAF_KANAL.append(zayaf_link)
+        await message.answer(
+            f"Zayafka link qo'shildi! Jami zayafka linklar soni: {len(ZAYAF_KANAL)}\n"
+            f"✅ Yuborilgan link: {zayaf_link}"
+        )
+        await state.finish()
+    else:
+        await message.answer(
+            "Iltimos, to'g'ri link yuboring:\n"
+            "- Telegram: https://t.me/... yoki @username\n"
+            "- Instagram: https://instagram.com/username"
+        )
+
 
 @dp.message_handler(text="❌Zayafka o'chirish", state="*")
 async def delete_zayaf_menu(message: types.Message, state: FSMContext):
@@ -1388,10 +1424,10 @@ async def start(message: types.Message, state: FSMContext):
         # Obunadan o'tganlar uchun asosiy menyu
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
+                 InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
                     ),
@@ -1602,17 +1638,20 @@ async def ask_suggestion(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "bekorx", state=SuggestionStates.waiting_for_suggestion)
 async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMContext):
     kanalim = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
-             InlineKeyboardButton(text="🗒 Kategoriya", callback_data="name_search")],
-            [InlineKeyboardButton(text="🔍 Kino qidirish...", switch_inline_query_current_chat=""),
-             InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
-            [InlineKeyboardButton(text="🛒 Saqlanganlar", callback_data="kor_kino"),
-             InlineKeyboardButton(text="🎲 Random", callback_data="random")],
-            [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif", callback_data="send_suggestion_")]  
-        ],
-        row_width=2
-    )
+             inline_keyboard=[
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
+                 InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
+                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+                 InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
+                [InlineKeyboardButton(
+                        text="🛒 Saqlanganlar", callback_data="kor_kino"
+                    ),
+                    InlineKeyboardButton(
+                        text="🎲Random", callback_data="random")
+                        ],
+                [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
+            ],row_width=2
+        )
     
     try:
         await callback_query.message.edit_text(
@@ -1974,10 +2013,10 @@ async def backs(calmes:types.CallbackQuery):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
+                 InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
                     ),
@@ -2234,10 +2273,10 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Kinolar | Kodli", callback_data="kodlik"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="🔥 Top filmlar | 10", callback_data="top_movies")],
+                 InlineKeyboardButton(text="Top 10 Filmlar", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
                     ),
