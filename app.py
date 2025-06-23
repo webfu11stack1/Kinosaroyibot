@@ -831,81 +831,64 @@ async def cancel_addition(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("Amal bekor qilindi.")
     await state.finish()
 
-@dp.message_handler(text="⛔️Kanal o'chirish", state="*")
-async def kanal_ochirish_menu(message: types.Message, state: FSMContext):
-    admin_id = message.from_user.id
-    if admin_id not in [1996936737]:  # <- bu yerga o'zingizning admin Telegram ID’laringizni yozing
-        await message.answer("⛔️ Sizda bu amalni bajarish huquqi yo‘q.")
-        return
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+import sqlite3
 
+# Holatlar
+class DeleteChannelState(StatesGroup):
+    choosing = State()
+    confirm = State()
+
+
+# 1. Kanal o‘chirish tugmasi bosilganda
+@dp.message_handler(text="⛔️Kanal o'chirish", state="*")
+async def show_channel_list(message: types.Message, state: FSMContext):
     conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
     cursor.execute("SELECT channel_id, channel_url FROM channel")
-    kanallar = cursor.fetchall()
+    channels = cursor.fetchall()
     conn.close()
 
-    if not kanallar:
-        await message.answer("📭 Bazada hozircha hech qanday kanal yo‘q.")
+    if not channels:
+        await message.answer("❌ Bazada hozircha hech qanday kanal yo‘q.")
         return
 
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    for kanal_id, kanal_url in kanallar:
-        keyboard.insert(
-            InlineKeyboardButton(
-                text=kanal_url,
-                callback_data=f"delconfirm_{kanal_id}|{kanal_url}"
-            )
-        )
+    kanal_text = "🗑 O‘chirmoqchi bo‘lgan kanal raqamini yuboring:\n\n"
+    kanal_dict = {}
 
-    await message.answer("O'chirmoqchi bo'lgan kanalni tanlang:", reply_markup=keyboard)
+    for index, (chan_id, chan_url) in enumerate(channels, start=1):
+        kanal_text += f"{index}) {chan_url}\n"
+        kanal_dict[str(index)] = (chan_id, chan_url)
 
-@dp.callback_query_handler(lambda c: c.data.startswith("delconfirm_"))
-async def confirm_delete_channel(call: CallbackQuery, state: FSMContext):
-    _, kanal_data = call.data.split("_", 1)
-    kanal_id, kanal_url = kanal_data.split("|", 1)
+    await state.update_data(kanal_dict=kanal_dict)
+    await message.answer(kanal_text)
+    await state.set_state(DeleteChannelState.choosing)
 
-    # saqlab qo‘yamiz tasdiq uchun
-    await state.update_data(kanal_id=kanal_id, kanal_url=kanal_url)
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton("✅ Ha, o'chir", callback_data="confirm_delete"),
-                InlineKeyboardButton("❌ Yo'q", callback_data="cancel_delete")
-            ]
-        ]
-    )
+# 2. Foydalanuvchi raqam yuboradi
+@dp.message_handler(state=DeleteChannelState.choosing, content_types=types.ContentTypes.TEXT)
+async def delete_selected_channel(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    kanal_dict = user_data.get("kanal_dict", {})
 
-    await call.message.edit_text(
-        f"⚠️ Siz rostdan ham quyidagi kanalni o‘chirmoqchimisiz?\n\n"
-        f"🆔 ID: `{kanal_id}`\n🔗 URL: {kanal_url}",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
+    choice = message.text.strip()
 
-@dp.callback_query_handler(lambda c: c.data == "confirm_delete", state="*")
-async def really_delete(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    kanal_id = data.get("kanal_id")
-    kanal_url = data.get("kanal_url")
+    if choice not in kanal_dict:
+        await message.answer("❌ Noto‘g‘ri raqam. Iltimos, ro‘yxatdagi raqamdan birini yuboring.")
+        return
 
+    kanal_id, kanal_url = kanal_dict[choice]
+
+    # Bazadan o‘chirish
     conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
     cursor.execute("DELETE FROM channel WHERE channel_id=? AND channel_url=?", (kanal_id, kanal_url))
     conn.commit()
     conn.close()
 
+    await message.answer(f"✅ Kanal o‘chirildi:\n{kanal_url}")
     await state.finish()
-    await call.message.edit_text(f"✅ Kanal o‘chirildi:\n🆔 `{kanal_id}`\n🔗 {kanal_url}", parse_mode="Markdown")
-    await state.finish()
-
-@dp.callback_query_handler(lambda c: c.data == "cancel_delete", state="*")
-async def cancel_delete_channel(call: CallbackQuery, state: FSMContext):
-    await state.finish()
-    await call.message.edit_text("❌ O‘chirish bekor qilindi.")
-    await state.finish()
-
-#Inine Xabar 
         
 @dp.message_handler(text="⚪️Inline Xabar",state="*")
 async def inline_xabar(message:types.Message,state:FSMContext):
