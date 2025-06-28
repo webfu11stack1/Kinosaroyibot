@@ -1216,18 +1216,28 @@ async def zayaf(message: types.Message, state: FSMContext):
 async def zayaf_n(message: types.Message, state: FSMContext):
     zayaf_link = message.text.strip()
 
-    if zayaf_link.startswith(('https://t.me/', '@', 'https://instagram.com/', 'https://www.instagram.com/')):
+    if zayaf_link.startswith((
+            'https://t.me/', 
+            '@', 
+            'https://instagram.com/', 
+            'https://www.instagram.com/', 
+            'https://youtube.com/', 
+            'https://www.youtube.com/', 
+            'https://youtu.be/'
+        )):
         ZAYAF_KANAL.append(zayaf_link)
         await message.answer(
-            f"Zayafka link qo'shildi! Jami zayafka linklar soni: {len(ZAYAF_KANAL)}\n"
-            f"✅ Yuborilgan link: {zayaf_link}"
+            f"✅ Zayafka link qo‘shildi!\n"
+            f"🔗 Yuborilgan link: {zayaf_link}\n"
+            f"📊 Jami zayafka linklar soni: {len(ZAYAF_KANAL)}"
         )
         await state.finish()
     else:
         await message.answer(
-            "Iltimos, to'g'ri link yuboring:\n"
+            "❌ Iltimos, to'g'ri link yuboring:\n"
             "- Telegram: https://t.me/... yoki @username\n"
-            "- Instagram: https://instagram.com/username"
+            "- Instagram: https://instagram.com/username\n"
+            "- YouTube: https://youtube.com/... yoki https://youtu.be/..."
         )
 
 
