@@ -71,7 +71,7 @@ with sqlite3.connect('kinosaroy1bot.db') as conn:
 conn.commit()
 
 
-TOKEN = "7132267047:AAFG_-7EjOA-8NCPBoKnmI4xEr6DBEpYgeQ"
+TOKEN = "7132267047:AAEN-XxuVk4V3WRFMXHxxzrKl39bEd_Z1SA"
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
