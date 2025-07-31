@@ -1417,7 +1417,7 @@ async def start(message: types.Message, state: FSMContext):
         # Obunadan o'tganlar uchun asosiy menyu
         kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
@@ -1632,7 +1632,7 @@ async def ask_suggestion(call: types.CallbackQuery, state: FSMContext):
 async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMContext):
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
@@ -1648,7 +1648,7 @@ async def cancel_suggestion(callback_query: types.CallbackQuery, state: FSMConte
     
     try:
         await callback_query.message.edit_text(
-            "✍️ Kino kodini yuboring. Bot kinoni tashlab beradi.",
+            "Kino kerakmi?✍️ Kerakli kino kodini botga jonating. Bot kinoni tashlab beradi.",
             parse_mode="HTML",
             reply_markup=kanalim
         )
@@ -2006,7 +2006,7 @@ async def backs(calmes:types.CallbackQuery):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
@@ -2266,7 +2266,7 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
     
     kanalim = InlineKeyboardMarkup(
              inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/ar7_movie"),
+                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
                 [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="Top 10 Filmlar", callback_data="top_movies")],
