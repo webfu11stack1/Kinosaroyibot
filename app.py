@@ -15,15 +15,25 @@ from aiogram.types.inline_keyboard import InlineKeyboardButton,InlineKeyboardMar
 from aiogram.types import InputTextMessageContent
 from telegram import CallbackQuery, InlineQueryResultArticle
 
-
 conn = sqlite3.connect('kinosaroy1bot.db')
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS userid (
+# userid jadvalini yaratish
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS userid (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE
+    user_id INTEGER UNIQUE,
+    status TEXT DEFAULT 'active'
 );
 ''')
+
+# Agar eski jadval allaqachon mavjud bo‘lsa va status ustuni yo‘q bo‘lsa, qo‘shib qo‘yish
+try:
+    cursor.execute("ALTER TABLE userid ADD COLUMN status TEXT DEFAULT 'active'")
+except sqlite3.OperationalError:
+    # ustun allaqachon mavjud bo‘lsa, xatolik chiqadi – uni e’tiborsiz qoldiramiz
+    pass
+
 cursor.execute('''CREATE TABLE IF NOT EXISTS channel (id INTEGER PRIMARY KEY, channel_id TEXT, channel_url TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS userid_today (id INTEGER PRIMARY KEY, user_id_tod INTEGER, registration_date DATE)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY, admin_id INTEGER , admin_name TEXT)''')
@@ -40,7 +50,6 @@ def init_db():
             description TEXT NOT NULL,
             video_file_id TEXT,
             movie_code INTEGER
-            
         )
     ''')
     conn.commit()
@@ -48,6 +57,10 @@ def init_db():
 
 init_db()
 cursor.execute("""CREATE TABLE IF NOT EXISTS saved_movies (id INTEGER PRIMARY KEY , user_id INTEGER , movie_code INTEGER )""")
+
+conn.commit()
+conn.close()
+
 import sqlite3
 
 # Connect to the database
@@ -715,23 +728,63 @@ async def rad(query:types.CallbackQuery,state:FSMContext):
     
 
 import sqlite3
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
+from aiogram import types
+from aiogram.dispatcher import FSMContext
 
-#Statistika
+# Statistika
 @dp.message_handler(text="📊Statistika", state="*")
 async def statistika(message: types.Message, state: FSMContext):
     conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(DISTINCT user_id) FROM userid")
-    user_count = cursor.fetchone()[0]
+    # Umumiy foydalanuvchilar
+    cursor.execute("SELECT COUNT(*) FROM userid")
+    total_users = cursor.fetchone()[0]
+
+    # Faol foydalanuvchilar
+    cursor.execute("SELECT COUNT(*) FROM userid WHERE status='active'")
+    active_users = cursor.fetchone()[0]
+
+    # Nofaol foydalanuvchilar
+    cursor.execute("SELECT COUNT(*) FROM userid WHERE status='inactive'")
+    inactive_users = cursor.fetchone()[0]
+
+    # Hozirgi sana
+    today = dt.now().date()
+    week_ago = today - timedelta(days=7)
+    month_start = today.replace(day=1)
+
+    # Bugun qo‘shilganlar
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date = ?", (today,))
+    today_users = cursor.fetchone()[0]
+
+    # Haftada qo‘shilganlar
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date >= ?", (week_ago,))
+    week_users = cursor.fetchone()[0]
+
+    # Oylik qo‘shilganlar
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date >= ?", (month_start,))
+    month_users = cursor.fetchone()[0]
+
+    conn.close()
 
     current_datetime = dt.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    await message.reply(f"⌚️Statistika vaqt: <b>{current_datetime}</b>\n\n"
-                        f"📊Foydalanuvchilar soni: <b>{user_count} ta</b> 👤 mavjud✅\n", parse_mode="HTML")
-    
+
+    await message.reply(
+        f"📊 <b>Statistika</b>\n\n"
+        f"⏰ Vaqt: <b>{current_datetime}</b>\n\n"
+        f"👥 Umumiy foydalanuvchilar: <b>{total_users}</b>\n"
+        f"✅ Faol: <b>{active_users}</b>\n"
+        f"❌ Nofaol (blok qilgan): <b>{inactive_users}</b>\n\n"
+        f"📅 Bugun qo‘shilgan: <b>{today_users}</b>\n"
+        f"🗓 Haftada qo‘shilgan: <b>{week_users}</b>\n"
+        f"📆 Oylik qo‘shilgan: <b>{month_users}</b>\n",
+        parse_mode="HTML"
+    )
+
     await state.finish()
+
 
 
 @dp.message_handler(text="📢Kanal bo'limi",state="*")
@@ -1359,7 +1412,7 @@ async def start(message: types.Message, state: FSMContext):
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
         
         await message.reply(
-            "``` Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:```⬇️",
+            "Iltimos, hamma kanallarga obuna bo'lib Tekshirish tugmasini bosing!⬇️",
             reply_markup=keyboard,
             parse_mode='MARKDOWN'
         )
@@ -1414,27 +1467,27 @@ async def start(message: types.Message, state: FSMContext):
         )
     else:
         
-        # Obunadan o'tganlar uchun asosiy menyu
-        kanalim = InlineKeyboardMarkup(
-             inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
-                 InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
-                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-                 InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
-                [InlineKeyboardButton(
-                        text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    ),
-                    InlineKeyboardButton(
-                        text="🎲Random", callback_data="random")
-                        ],
-                [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
-            ],row_width=2
-        )
+        # # Obunadan o'tganlar uchun asosiy menyu
+        # kanalim = InlineKeyboardMarkup(
+        #      inline_keyboard=[
+        #         [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
+        #          InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
+        #         [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+        #          InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
+        #         [InlineKeyboardButton(
+        #                 text="🛒 Saqlanganlar", callback_data="kor_kino"
+        #             ),
+        #             InlineKeyboardButton(
+        #                 text="🎲Random", callback_data="random")
+        #                 ],
+        #         [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
+        #     ],row_width=2
+        # )
         await bot.send_message(
             chat_id=message.chat.id,
-            text=f"✍️Kino kodini jonating. Bot kinoni tashlab beradi.",
-            parse_mode="MARKDOWN",
-            reply_markup=kanalim
+            text=f"Assaloomu alaykum, Kino kodini jo'nating! ✍️",
+            parse_mode="MARKDOWN"
+            
         )
         await state.set_state("name_qidir")
 
@@ -1888,7 +1941,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
         keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
 
         await msg.reply(
-            "``` Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:```⬇️",
+            "Iltimos, hamma kanallarga obuna bolib Tekshirish tugmasini bosing!⬇️",
             reply_markup=keyboard,
             parse_mode='MARKDOWN'
         )
