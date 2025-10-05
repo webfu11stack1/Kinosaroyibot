@@ -8,17 +8,19 @@ from aiogram.contrib.middlewares.logging import LoggingMiddleware
 import logging
 
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.types.reply_keyboard import ReplyKeyboardMarkup,KeyboardButton
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types.inline_keyboard import InlineKeyboardButton,InlineKeyboardMarkup
 from aiogram.types import InputTextMessageContent
-from telegram import CallbackQuery, InlineQueryResultArticle
+# from telegram import CallbackQuery, InlineQueryResultArticle
+
+import sqlite3
 
 conn = sqlite3.connect('kinosaroy1bot.db')
 cursor = conn.cursor()
 
-# userid jadvalini yaratish
+# userid jadvali
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS userid (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,18 +33,40 @@ CREATE TABLE IF NOT EXISTS userid (
 try:
     cursor.execute("ALTER TABLE userid ADD COLUMN status TEXT DEFAULT 'active'")
 except sqlite3.OperationalError:
-    # ustun allaqachon mavjud bo‘lsa, xatolik chiqadi – uni e’tiborsiz qoldiramiz
     pass
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS channel (id INTEGER PRIMARY KEY, channel_id TEXT, channel_url TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS userid_today (id INTEGER PRIMARY KEY, user_id_tod INTEGER, registration_date DATE)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY, admin_id INTEGER , admin_name TEXT)''')
+# Kanal jadvali
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS channel (
+    id INTEGER PRIMARY KEY,
+    channel_id TEXT,
+    channel_url TEXT
+)
+''')
 
+# Bugungi ro‘yxatdan o‘tgan foydalanuvchilar jadvali
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS userid_today (
+    id INTEGER PRIMARY KEY,
+    user_id_tod INTEGER,
+    registration_date DATE
+)
+''')
+
+# Adminlar jadvali
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY,
+    admin_id INTEGER,
+    admin_name TEXT
+)
+''')
+
+# Filmlar jadvali
 def init_db():
     conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
 
-    # Create the movies table with necessary columns
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY,
@@ -56,10 +80,26 @@ def init_db():
     conn.close()
 
 init_db()
-cursor.execute("""CREATE TABLE IF NOT EXISTS saved_movies (id INTEGER PRIMARY KEY , user_id INTEGER , movie_code INTEGER )""")
 
-conn.commit()
-conn.close()
+# Saqlangan filmlar jadvali
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS saved_movies (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    movie_code INTEGER
+)
+''')
+
+# 🆕 Premium foydalanuvchilar jadvali
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS premium_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE,
+    full_name TEXT,
+    added_time TEXT,
+    end_date TEXT
+)
+''')
 
 import sqlite3
 
@@ -78,10 +118,62 @@ with sqlite3.connect('kinosaroy1bot.db') as conn:
         print("Table yes")
 
     print("Column 'download_count' added successfully.")
-
-
-
 conn.commit()
+conn.close()
+
+from datetime import datetime, timedelta
+
+import sqlite3
+from datetime import datetime, timedelta
+
+def add_premium_user(user_id, full_name, days=30):
+    """Foydalanuvchini premiumga qo‘shadi"""
+    conn = sqlite3.connect("kinosaroy1bot.db")
+    cursor = conn.cursor()
+
+    # Tugash vaqtini hisoblaymiz (30 kun)
+    start_date = datetime.now()
+    end_date = start_date + timedelta(days=days)
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS premium_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE,
+        full_name TEXT,
+        start_date TEXT,
+        end_date TEXT
+    )''')
+
+    cursor.execute('''
+        INSERT OR REPLACE INTO premium_users (user_id, full_name, start_date, end_date)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, full_name, start_date.strftime("%Y-%m-%d %H:%M"), end_date.strftime("%Y-%m-%d %H:%M")))
+
+    conn.commit()
+    conn.close()
+
+
+
+def is_premium(user_id):
+    conn = sqlite3.connect("kinosaroy1bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT end_date FROM premium_users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+
+    if not result:
+        conn.close()
+        return False
+
+    end_date = datetime.strptime(result[0], "%Y-%m-%d %H:%M")
+    now = datetime.now()
+
+    if now > end_date:
+        cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+        return False
+
+    conn.close()
+    return True
 
 
 TOKEN = "7132267047:AAEN-XxuVk4V3WRFMXHxxzrKl39bEd_Z1SA"
@@ -165,39 +257,225 @@ async def panel(message: types.Message, state: FSMContext):
 
 
 
+from aiogram import types
+from aiogram.dispatcher import FSMContext
+from aiogram.types import ReplyKeyboardMarkup
+import sqlite3
+from datetime import datetime, timedelta
+
+# --- ADMIN PANEL ---
 @dp.message_handler(commands=["panel"], state="*")
 async def panel(message: types.Message, state: FSMContext):
     mes_id = message.from_user.id
     conn = sqlite3.connect('kinosaroy1bot.db')
     cursor = conn.cursor()
-
     cursor.execute("SELECT admin_id FROM admins")
-    admin_user_ids = cursor.fetchall()  # Fetch all admin IDs
+    admin_user_ids = [admin[0] for admin in cursor.fetchall()]
+    conn.close()
 
-    admin_user_ids = [admin[0] for admin in admin_user_ids]  # Extract IDs from tuples
+    if mes_id in admin_user_ids or mes_id == 1996936737:
+        panel = ReplyKeyboardMarkup(
+            keyboard=[
+                ["📊Statistika", "⚪️Xabarlar bo'limi"],
+                ["📑Users", "📑Baza"],
+                ["🎥Kino bo'limi"],
+                ["👤Admin bo'limi", "📢Kanal bo'limi"],
+                ["💎Premium boshqaruvi"]
+            ],
+            resize_keyboard=True
+        )
+        await message.answer("✅ Panel bo‘limi!", reply_markup=panel)
+        await state.set_state("panel")
+    else:
+        await message.answer("⛔ Siz admin emassiz!")
+
+# --- PREMIUM BOSHQARUV ---
+@dp.message_handler(text="💎Premium boshqaruvi", state="*")
+async def premium_menu(message: types.Message, state: FSMContext):
+    markup = ReplyKeyboardMarkup(
+        keyboard=[
+            ["➕ID orqali premium qo‘shish", "📋 Premiumlar ro‘yxati"],
+            ["🗑 ID orqali premiumni o‘chirish"],
+            ["⬅️ Orqaga"]
+        ],
+        resize_keyboard=True
+    )
+    await message.answer("💎 Premium foydalanuvchilarni boshqarish menyusi:", reply_markup=markup)
+    await state.set_state("premium_menu")
+
+
+# --- PREMIUM QO‘SHISH (BOSHLASH) ---
+@dp.message_handler(text ="➕ID orqali premium qo‘shish", state="*")
+async def ask_user_id(message: types.Message, state: FSMContext):
+    await message.answer("👤 Premiumga qo‘shmoqchi bo‘lgan foydalanuvchining ID raqamini kiriting:")
+    await state.set_state("add_premium_id")
+
+# --- PREMIUM QO‘SHISH (ISHGA TUSHURISH) ---
+@dp.message_handler(state="add_premium_id")
+async def add_premium_user(message: types.Message, state: FSMContext):
     try:
-        if mes_id in admin_user_ids or mes_id == 1996936737:
-            panel = ReplyKeyboardMarkup(
-                keyboard=[
-                    ["📊Statistika", "⚪️Xabarlar bo'limi"],
-                   
-                    ["📑Users","📑Baza"],
-                    ["🎥Kino bo'limi"] ,
-                     ["👤Admin bo'limi", "📢Kanal bo'limi"]
-                   
-                ], resize_keyboard=True
-            )
-            await message.answer("Panel bo'limi!", reply_markup=panel)
-            await state.set_state("panel")
-        else:
-            pass
+        user_id = int(message.text)
+    except ValueError:
+        await message.answer("❌ Noto‘g‘ri ID! Raqam kiriting.")
+        return
+
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+
+    # Jadval mavjudligini tekshirish / yaratish
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS premium_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE,
+            full_name TEXT,
+            added_time TEXT,
+            end_date TEXT
+        )
+    ''')
+
+    # Foydalanuvchi ma’lumotlarini olish (agar botda saqlanmagan bo‘lsa)
+    try:
+        user = await bot.get_chat(user_id)
+        full_name = user.full_name
+    except Exception:
+        full_name = "Noma’lum foydalanuvchi"
+
+    added_time = datetime.now()
+    end_date = added_time + timedelta(days=30)
+
+    cursor.execute('''
+        INSERT OR REPLACE INTO premium_users (user_id, full_name, added_time, end_date)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, full_name, added_time.strftime("%Y-%m-%d %H:%M"), end_date.strftime("%Y-%m-%d %H:%M")))
+
+    conn.commit()
+    conn.close()
+
+    await message.answer(
+        f"✅ <b>{full_name}</b> (ID: <code>{user_id}</code>) premiumga qo‘shildi!\n"
+        f"📅 Tugash muddati: <b>{end_date.strftime('%Y-%m-%d')}</b>",
+        parse_mode="HTML"
+    )
+    await state.set_state("premium_menu")
+
+# --- PREMIUM OCHIRISH (TUGATISH) ---
+
+@dp.message_handler(text="🗑 ID orqali premiumni o‘chirish", state="premium_menu")
+async def ask_premium_remove_id(message: types.Message, state: FSMContext):
+    await message.answer("🗑 Premiumdan o‘chirmoqchi bo‘lgan foydalanuvchi ID raqamini yuboring:")
+    await state.set_state("remove_premium_user")
+@dp.message_handler(state="remove_premium_user")
+async def remove_premium_user(message: types.Message, state: FSMContext):
+    ADMIN_ID = 1996936737  # 🔹 o‘zingizning Telegram ID'ingizni yozing
+
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Sizda bu amalni bajarish huquqi yo‘q.")
+        return
+
+    try:
+        user_id = int(message.text)
+
+        with sqlite3.connect("kinosaroy1bot.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM premium_users WHERE user_id = ?", (user_id,))
+            user = cursor.fetchone()
+
+            if user:
+                cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
+                conn.commit()
+                await message.answer(
+                    f"✅ Foydalanuvchi (<code>{user_id}</code>) premium ro‘yxatdan o‘chirildi.",
+                    parse_mode="HTML"
+                )
+            else:
+                await message.answer("❌ Bu foydalanuvchi premium ro‘yxatda topilmadi.")
+
+    except ValueError:
+        await message.answer("⚠️ ID raqamini to‘g‘ri formatda kiriting (faqat raqam).")
     except Exception as e:
-        await message.answer("Panelga kirishda xatolik yuz berdi.")
-        print(f"Error: {e}")
-    finally:
-        conn.commit()
-        conn.close()
-        await state.finish()
+        await message.answer(f"⚠️ Xatolik yuz berdi: {e}")
+
+    await state.set_state("premium_menu")
+
+import sqlite3
+from aiogram import types
+from aiogram.dispatcher import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# --- PREMIUM USERLARNI OLISH FUNKSIYASI ---
+def get_premium_users(page: int, limit: int = 10):
+    conn = sqlite3.connect("kinosaroy1bot.db")
+    cursor = conn.cursor()
+
+    offset = page * limit
+    cursor.execute(
+        "SELECT user_id, full_name, end_date FROM premium_users ORDER BY end_date DESC LIMIT ? OFFSET ?",
+        (limit, offset)
+    )
+    users = cursor.fetchall()
+
+    # Sahifalar sonini hisoblash
+    cursor.execute("SELECT COUNT(*) FROM premium_users")
+    total_users = cursor.fetchone()[0]
+    total_pages = (total_users - 1) // limit + 1 if total_users > 0 else 1
+
+    conn.close()
+    return users, total_pages
+
+
+# --- SAHIFA O‘ZGARTIRISH TUGMALARI ---
+def generate_nav_markup(page: int, total_pages: int):
+    markup = InlineKeyboardMarkup(row_width=2)
+    buttons = []
+
+    if page > 0:
+        buttons.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"prev_page_{page-1}"))
+    if page < total_pages - 1:
+        buttons.append(InlineKeyboardButton("➡️ Keyingi", callback_data=f"next_page_{page+1}"))
+
+    markup.add(*buttons)
+    return markup
+
+
+# --- PREMIUMLARNI KO‘RSATISH HANDLER ---
+@dp.message_handler(lambda msg: msg.text == "📋 Premiumlar ro‘yxati", state="premium_menu")
+async def show_premium_users(message: types.Message, state: FSMContext):
+    page = 0
+    users, total_pages = get_premium_users(page)
+
+    if not users:
+        await message.answer("❌ Hozircha premium foydalanuvchilar yo‘q.")
+        return
+
+    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
+    for i, (user_id, full_name, end_date) in enumerate(users, start=1):
+        text += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a> — {end_date}\n"
+
+    markup = generate_nav_markup(page, total_pages)
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+# --- SAHIFA TUGMALARINI QAYTA ISHLASH ---
+@dp.callback_query_handler(lambda c: c.data.startswith(("prev_page_", "next_page_")))
+async def change_page(call: types.CallbackQuery):
+    page = int(call.data.split("_")[-1])
+    users, total_pages = get_premium_users(page)
+
+    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
+    for i, (user_id, full_name, end_date) in enumerate(users, start=1):
+        text += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a> — {end_date}\n"
+
+    markup = generate_nav_markup(page, total_pages)
+    await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await call.answer()
+
+
+
+# --- ORQAGA QAYTISH ---
+@dp.message_handler(lambda msg: msg.text == "⬅️ Orqaga", state="premium_menu")
+async def back_to_panel(message: types.Message, state: FSMContext):
+    await panel(message, state)
+
 
 @dp.message_handler(text="🎥Kino bo'limi",state="*")
 async def kinobol(message:types.Message,state:FSMContext):
@@ -769,7 +1047,7 @@ async def statistika(message: types.Message, state: FSMContext):
 
     conn.close()
 
-    current_datetime = dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_datetime = dt.now().strftime("%Y-%m-%d %H:%M")
 
     await message.reply(
         f"📊 <b>Statistika</b>\n\n"
@@ -1342,122 +1620,127 @@ async def process_delete_zayaf(message: types.Message, state: FSMContext):
 async def start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user_name_full = message.from_user.full_name
-    movie_name=None
+    movie_name = None
 
-    # Bazaga ulanish va foydalanuvchini tekshirish
     with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
 
-        # Foydalanuvchi bazada bormi yoki yo'qmi tekshirish
+        # 🔹 Premium foydalanuvchimi tekshirish
+        cursor.execute("SELECT added_time FROM premium_users WHERE user_id = ?", (user_id,))
+        premium_data = cursor.fetchone()
+        is_premium = False
+
+        if premium_data:
+            from datetime import datetime, timedelta
+            added_time = datetime.strptime(premium_data[0], "%Y-%m-%d %H:%M")
+            now = datetime.now()
+
+            # 1 oylik obuna muddati tekshiriladi
+            if now - added_time < timedelta(days=30):
+                is_premium = True
+            else:
+                # Muddati o'tgan bo‘lsa bazadan o‘chirib tashlanadi
+                cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
+                conn.commit()
+
+        # 🔹 Foydalanuvchini bazaga qo‘shish
         cursor.execute("SELECT COUNT(*) FROM userid WHERE user_id = ?", (user_id,))
         user_exists = cursor.fetchone()[0]
-
-        if user_exists == 0:  # Foydalanuvchi bazada yo'q bo'lsa
-            # Foydalanuvchini bazaga qo'shish
+        if user_exists == 0:
             cursor.execute("INSERT INTO userid (user_id) VALUES (?)", (user_id,))
             conn.commit()
 
-            # Jami foydalanuvchilar sonini olish
+            # Yangi foydalanuvchi haqida kanalga xabar
             cursor.execute("SELECT COUNT(*) FROM userid")
             user_count = cursor.fetchone()[0]
-
-            # Telegram kanalga xabar yuborish
-            channel_id = '-1002107713154'  # Kanalning ID
-            message_text = f"<b>Yangi foydalanuvchi:</b>\n1.Ism:<i>{user_name_full}</i>\n2.Profil: tg://user?id={user_id}\n3.Jami Foydalanuvchi: {user_count}"
-
+            channel_id = '-1002107713154'
+            message_text = (
+                f"<b>Yangi foydalanuvchi:</b>\n"
+                f"1. Ism: <i>{user_name_full}</i>\n"
+                f"2. Profil: tg://user?id={user_id}\n"
+                f"3. Jami Foydalanuvchi: {user_count}"
+            )
             try:
                 await bot.send_message(channel_id, message_text, parse_mode="HTML")
-            except aiogram.utils.exceptions.CantParseEntities as e:
+            except:
                 pass
-        else:
-            pass
-                
-        # Agar komanda bilan birga kod berilgan bo'lsa
+
+        # Agar foydalanuvchi kino kodi bilan kirgan bo‘lsa
         if " " in message.text:
             movie_name = message.text.split(" ", 1)[1].strip().lower()
             cursor.execute(
                 '''SELECT name, description, video_file_id, movie_code, download_count 
-                FROM movies 
-                WHERE LOWER(name) LIKE ? OR movie_code LIKE ?''',
+                   FROM movies 
+                   WHERE LOWER(name) LIKE ? OR movie_code LIKE ?''',
                 ('%' + movie_name + '%', '%' + movie_name + '%')
             )
             movie_data = cursor.fetchone()
 
-        # Kanal obunasini tekshirish
-        cursor.execute("SELECT channel_id, channel_url FROM channel")
-        channels = cursor.fetchall()
+        # 🔹 Agar premium foydalanuvchi bo‘lsa — kanallarni tekshirmaymiz
+        if is_premium:
+            pass
+        #     await bot.send_message(
+        #     chat_id=message.chat.id,
+        #     text=f"Assaloomu alaykum, Kino kodini jo'nating! ✍️",
+        #     parse_mode="MARKDOWN"
+        # )
+        else:
+            # Oddiy foydalanuvchilar uchun kanal obunasi tekshiriladi
+            cursor.execute("SELECT channel_id, channel_url FROM channel")
+            channels = cursor.fetchall()
 
-    # Kanallarni tekshirish
-    unsubscribed_channels = []
-    for channel_id, _ in channels:
-        status = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
-        if status.status == "left":
-            unsubscribed_channels.append(channel_id)
+            unsubscribed_channels = []
+            for channel_id, _ in channels:
+                status = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
+                if status.status == "left":
+                    unsubscribed_channels.append(channel_id)
 
-    if unsubscribed_channels:
-        keyboard = InlineKeyboardMarkup(row_width=1)
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
-        
-        for zayaf_url in ZAYAF_KANAL:
-            keyboard.add(InlineKeyboardButton(
-                text="➕ Obuna bo'lish", 
-                url=zayaf_url
-            ))  
-        
-        
-        
-        for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ", url=channel_url))  
-        
-        keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
-        
-        await message.reply(
-            "Iltimos, hamma kanallarga obuna bo'lib Tekshirish tugmasini bosing!⬇️",
-            reply_markup=keyboard,
-            parse_mode='MARKDOWN'
-        )
-        return  # Davom ettirmaslik
+            if unsubscribed_channels:
+                keyboard = InlineKeyboardMarkup(row_width=1)
+                keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1", url="https://www.instagram.com/ar7.movie"))
 
-    # Agar obunalar tekshirilgan bo'lsa
+                for zayaf_url in ZAYAF_KANAL:
+                    keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=zayaf_url))
+                for _, channel_url in channels:
+                    keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish", url=channel_url))
+
+                keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True"))
+                keyboard.add(InlineKeyboardButton(text="💎Premium",callback_data="premium_info"))
+                
+                await message.reply(
+                    """❌ Kechirasiz, botimizdan foydalanish uchun ushbu kanallarga obuna bo'lishingiz kerak.\n
+                    ```💎 Premium obuna sotib olib, kanallarga obuna bo‘lmasdan foydalanishingiz mumkin.``` """,
+                    reply_markup=keyboard,
+                    parse_mode='MARKDOWN'
+                )
+                return
+
+    # 🔹 Obunadan o‘tgan yoki premium foydalanuvchi uchun davom etamiz
     if movie_name and movie_data:
         name, description, video_file_id, movie_code, download_count = movie_data
-
-        # Yuklashlar sonini yangilash (bazaga)
         new_download_count = download_count + 1
+
         with sqlite3.connect('kinosaroy1bot.db') as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE movies SET download_count = ? WHERE movie_code = ?",
-                (new_download_count, movie_code)
-            )
+            cursor.execute("UPDATE movies SET download_count = ? WHERE movie_code = ?", (new_download_count, movie_code))
             conn.commit()
 
-        # Inline tugma
         inline = InlineKeyboardMarkup(
-            inline_keyboard=[ 
+            inline_keyboard=[
                 [
-                    InlineKeyboardButton(
-                        text="Do'stlarga yuborish",
-                        switch_inline_query=f"{movie_code}"  # movie_code ni yuborish
-                    ),
-                    InlineKeyboardButton(
-                        text="📥 Saqlash", callback_data=f"save_movie:{movie_code}"  # Callbackda movie_codeni berish
-                    )
+                    InlineKeyboardButton(text="Do'stlarga yuborish", switch_inline_query=f"{movie_code}"),
+                    InlineKeyboardButton(text="📥 Saqlash", callback_data=f"save_movie:{movie_code}")
                 ],
                 [
-                    InlineKeyboardButton(
-                        text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )
-                    
+                    InlineKeyboardButton(text="🛒 Saqlanganlar", callback_data="kor_kino")
                 ],
                 [
-                    InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")
+                    InlineKeyboardButton(text="🔍Nom orqali qidirish...", switch_inline_query_current_chat="")
                 ]
             ],
             row_width=2
         )
 
-        # Video yuborish
         await bot.send_video(
             chat_id=message.chat.id,
             video=video_file_id,
@@ -1465,31 +1748,180 @@ async def start(message: types.Message, state: FSMContext):
             reply_markup=inline,
             parse_mode="HTML"
         )
+
     else:
-        
-        # # Obunadan o'tganlar uchun asosiy menyu
-        # kanalim = InlineKeyboardMarkup(
-        #      inline_keyboard=[
-        #         [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
-        #          InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
-        #         [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
-        #          InlineKeyboardButton(text="Kop qidirilganlar | 10", callback_data="top_movies")],
-        #         [InlineKeyboardButton(
-        #                 text="🛒 Saqlanganlar", callback_data="kor_kino"
-        #             ),
-        #             InlineKeyboardButton(
-        #                 text="🎲Random", callback_data="random")
-        #                 ],
-        #         [InlineKeyboardButton("Kino so'rash | Savol yoki Taklif ", callback_data=f"send_suggestion_")]  
-        #     ],row_width=2
-        # )
         await bot.send_message(
             chat_id=message.chat.id,
             text=f"Assaloomu alaykum, Kino kodini jo'nating! ✍️",
             parse_mode="MARKDOWN"
-            
         )
         await state.set_state("name_qidir")
+
+
+
+# ---------- PREMIUM-------------#
+
+@dp.callback_query_handler(lambda c: c.data == "premium_info")
+async def premium_info(callback_query: types.CallbackQuery):
+    text = (
+        "🎟 <b>AR7 MOVIE Premium</b>\n\n"
+        "💎 Premium obuna sizga quyidagi imkoniyatlarni beradi:\n"
+        "• 📺 Kanallarga obunasiz kinolarni ko‘rish\n"
+        "• 🎞 Yuqori sifatli kinolarni ko‘rish\n"
+        "• 🚫 Reklamalarsiz foydalanish\n"
+        "• ⚡ Tezroq video yuklanish\n"
+        "• 🕐 Obuna muddati: <b>1 oy</b>\n\n"
+        "💰 Narxi: <b>12 000 so‘m</b>\n\n"
+        "💳 Sotib olish uchun quyidagi tugmani bosing 👇"
+    )
+    buy_button = InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton("💳 Sotib olish", callback_data="buy_premium"),
+        InlineKeyboardButton("⬅️ Orqaga", url="https://t.me/kinosaroyibot?start=True")
+    )
+    await callback_query.message.edit_text(text, parse_mode="HTML", reply_markup=buy_button)
+
+
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+
+class PremiumBuy(StatesGroup):
+    waiting_for_check = State()
+
+
+@dp.callback_query_handler(lambda c: c.data == "buy_premium")
+async def buy_premium(callback_query: types.CallbackQuery, state: FSMContext):
+    premium_text = (
+        "💎 <b>Premium obuna</b>\n\n"
+        "🕐 Muddati: <b>1 oy</b>\n"
+        "💰 Narxi: <b>12 000 so‘m</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "👤 <b>To‘lov qabul qiluvchi:</b>\n"
+        "   Asadbek Rahmonov\n\n"
+        "💳 <b>Karta raqami:</b>\n"
+        "   <code>9860 0121 2777 4144</code>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "✅ To‘lovni amalga oshirgandan so‘ng <b>chek rasmini shu yerga yuboring.</b>\n\n"
+        "⚠️ <i>Faqat to‘lovni qilgan shaxsning cheki qabul qilinadi!</i>"
+    )
+
+    # 🔹 Inline tugmalar (Sotib olish + Orqaga)
+    markup = InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton("⬅️ Orqaga", url="https://t.me/kinosaroyibot?start=True")
+    )
+
+    # 🔹 O‘sha xabarni yangilab chiqarish
+    await callback_query.message.edit_text(premium_text, parse_mode="HTML", reply_markup=markup)
+    await state.set_state(PremiumBuy.waiting_for_check)
+    await callback_query.answer()
+
+
+
+CHANNEL_ID_PRM = -1003025998923  # admin kanal ID
+# ADMIN_ID_PRM = 123456789  # admin foydalanuvchi ID (xohlovchi rad/qo‘shish tugmasi bosadi)
+
+
+
+@dp.message_handler(content_types=['photo'], state=PremiumBuy.waiting_for_check)
+async def handle_check(message: types.Message, state: FSMContext):
+    global full_prem;
+    user_id = message.from_user.id
+    full_prem = message.from_user.full_name
+    photo_id = message.photo[-1].file_id
+
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    caption = (
+        f"📸 <b>Yangi Premium to‘lov:</b>\n\n"
+        f"👤 Ism: <i>{full_prem}</i>\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"🕒 Vaqt: {now}\n\n"
+        f"<b>Admin:</b> foydalanuvchini premiumga qo‘shish yoki rad eting 👇"
+    )
+
+    buttons = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton("✅ Qo‘shish", callback_data=f"approve_premium:{user_id}"),
+            InlineKeyboardButton("❌ Rad etish", callback_data=f"reject_premium:{user_id}")
+        ]
+    ])
+
+    await bot.send_photo(CHANNEL_ID_PRM, photo=photo_id, caption=caption, parse_mode="HTML", reply_markup=buttons)
+    await message.answer("✅ Chekingiz yuborildi. Admin tasdiqlashi kutilmoqda...")
+    await state.finish()
+
+
+
+from datetime import datetime, timedelta
+import sqlite3
+
+@dp.callback_query_handler(lambda c: c.data.startswith("approve_premium:"))
+async def approve_premium(callback_query: types.CallbackQuery):
+    user_id = int(callback_query.data.split(":")[1])
+    now = datetime.now()
+    end_date = now + timedelta(days=30)  # ✅ 30 kunlik premium
+
+    # Ma'lumotlar bazasiga yozish
+    with sqlite3.connect('kinosaroy1bot.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO premium_users (user_id, full_name, added_time, end_date)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, f"{full_prem}", now.strftime("%Y-%m-%d %H:%M"), end_date.strftime("%Y-%m-%d %H:%M")))
+        conn.commit()
+
+    # Foydalanuvchiga xabar
+    try:
+        await bot.send_message(
+            user_id,
+            f"🎉 Sizning Premium obunangiz faollashtirildi!\n"
+            f"📅 Tugash muddati: {end_date.strftime('%Y-%m-%d %H:%M')}\n"
+            f"Boshlash uchun /start ni bosing."
+        )
+    except:
+        pass
+
+    # “Javob yozish” tugmasi
+    reply_btn = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("💬 Javob yozish", url=f"tg://user?id={user_id}")]
+    ])
+
+    await callback_query.message.edit_caption(
+        caption=callback_query.message.caption + "\n\n✅ <b>Premium faollashtirildi (30 kunlik)</b>",
+        parse_mode="HTML",
+        reply_markup=reply_btn
+    )
+
+    await callback_query.answer("✅ Premium faollashtirildi.")
+
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("reject_premium:"))
+async def reject_premium(callback_query: types.CallbackQuery):
+    user_id = int(callback_query.data.split(":")[1])
+
+    reply_btn = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("💬 Javob yozish", url=f"tg://user?id={user_id}")]
+    ])
+
+    await callback_query.message.edit_caption(
+        caption=callback_query.message.caption + "\n\n❌ <b>To‘lov rad etildi</b>",
+        parse_mode="HTML",
+        reply_markup=reply_btn
+    )
+
+    try:
+        await bot.send_message(
+            user_id,
+            "❌ Siz yuborgan Premium to‘lov rad etildi. Iltimos, to‘lovni tekshirib qaytadan urinib ko‘ring."
+        )
+    except:
+        pass
+
+    await callback_query.answer("❌ To‘lov rad etildi.")
+
+
+
 
 @dp.callback_query_handler(lambda c: c.data == "random",state="*")
 async def send_random_movie(callback_query: types.CallbackQuery):
@@ -1609,7 +2041,7 @@ async def send_random_movie(callback_query: types.CallbackQuery):
                         )
                     ],
                     [
-                        InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+                        InlineKeyboardButton(text="🔍Nom orqali qidirish...", switch_inline_query_current_chat=""),
                         InlineKeyboardButton(text="Keyingisi⏩", callback_data="rand2")
                     ]
                 ],
@@ -1904,100 +2336,132 @@ async def export_users():
 
 
 import aiogram.utils
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.dispatcher import FSMContext
+import sqlite3
+from datetime import datetime
+
 @dp.message_handler(lambda message: message.text.isdigit(), state="*")
 async def check_movie_code(msg: Message, state: FSMContext):
     user_id = msg.from_user.id
     movie_code = msg.text
 
-    # Bazaga ulanish
+    # 🔹 Premium holatini tekshirish
+    is_premium = False
     with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
+        cursor.execute("""
+            SELECT added_time, end_date
+            FROM premium_users
+            WHERE user_id = ?
+        """, (user_id,))
+        user = cursor.fetchone()
 
-        # Kanal obunalarini tekshirish
-        cursor.execute("SELECT channel_id, channel_url FROM channel")
-        channels = cursor.fetchall()
+    if user:
+        added_time, end_date = user
+        if end_date:
+            try:
+                # 🔸 Formatni avtomatik aniqlash
+                try:
+                    expiry_date = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    expiry_date = datetime.strptime(end_date, "%Y-%m-%d")
 
-    unsubscribed_channels = []
-    for channel_id, _ in channels:
-        status = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
-        if status.status == "left":
-            unsubscribed_channels.append(channel_id)
+                if expiry_date > datetime.now():
+                    is_premium = True
+                else:
+                    # Premium muddati tugagan — o‘chirish
+                    with sqlite3.connect('kinosaroy1bot.db') as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM premium_users WHERE user_id=?", (user_id,))
+                        conn.commit()
+            except Exception as e:
+                print(f"Premium date parse error: {e}")
+        else:
+            # Agar end_date bo‘lmasa ham, premium deb hisoblaymiz (xato saqlangan bo‘lishi mumkin)
+            is_premium = True
 
-    if unsubscribed_channels:
-        keyboard = InlineKeyboardMarkup(row_width=1)
-        
-        keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish 1",url="https://www.instagram.com/ar7.movie"))
-        for zayaf_url in ZAYAF_KANAL:
-            keyboard.add(InlineKeyboardButton(
-                text="➕ Obuna bo'lish", 
-                url=zayaf_url
-            ))  
-        
-        
-        
-        for _, channel_url in channels:
-            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo'lish ", url=channel_url))  
-        
-        keyboard.add(InlineKeyboardButton(text="Tekshirish ✅", url="https://t.me/kinosaroyibot?start=True" ))
+    # 🔹 Agar premium bo‘lsa — kanal tekshiruvisiz davom etadi
+    if is_premium:
+        pass
+    else:
+        # 🔹 Premium bo‘lmasa, kanalga obuna bo‘lishni so‘rash
+        with sqlite3.connect('kinosaroy1bot.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT channel_id, channel_url FROM channel")
+            channels = cursor.fetchall()
 
-        await msg.reply(
-            "Iltimos, hamma kanallarga obuna bolib Tekshirish tugmasini bosing!⬇️",
-            reply_markup=keyboard,
-            parse_mode='MARKDOWN'
-        )
-        await state.finish()
-        return  # Davom ettirmaslik
+        unsubscribed_channels = []
+        for channel_id, _ in channels:
+            try:
+                status = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
+                if status.status == "left":
+                    unsubscribed_channels.append(channel_id)
+            except:
+                continue
 
-    # Kino ma'lumotlarini bazadan olish
+        if unsubscribed_channels:
+            keyboard = InlineKeyboardMarkup(row_width=1)
+            keyboard.add(InlineKeyboardButton(text="➕ Obuna bo‘lish 1", url="https://www.instagram.com/ar7.movie"))
+
+            for zayaf_url in ZAYAF_KANAL:
+                keyboard.add(InlineKeyboardButton(text="➕ Obuna bo‘lish", url=zayaf_url))
+
+            for _, channel_url in channels:
+                keyboard.add(InlineKeyboardButton(text="➕ Obuna bo‘lish", url=channel_url))
+
+            keyboard.add(InlineKeyboardButton(text="✅ Tekshirish", url="https://t.me/kinosaroyibot?start=True"))
+            keyboard.add(InlineKeyboardButton(text="💎 Premium olish", callback_data="premium_info"))
+
+            await msg.reply(
+                    """❌ Kechirasiz, botimizdan foydalanish uchun ushbu kanallarga obuna bo'lishingiz kerak.\n
+                    ```💎 Premium obuna sotib olib, kanallarga obuna bo‘lmasdan foydalanishingiz mumkin.``` """,
+                    reply_markup=keyboard,
+                    parse_mode='MARKDOWN'
+                )
+            await state.finish()
+            return
+
+    # 🔹 Kino ma‘lumotlarini olish
     with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT name, description, video_file_id, download_count FROM movies WHERE movie_code = ?", (movie_code,))
         movie_data = cursor.fetchone()
 
     if not movie_data:
-        await msg.answer("❌ Bunday kodli kino hozircha mavjud emas")
+        await msg.answer("❌ Bunday kodli kino hozircha mavjud emas.")
         return
 
     name, description, video_file_id, download_count = movie_data
 
     if not video_file_id:
-        await msg.answer("❌ Video fayli topilmadi yoki noto'g'ri ID")
+        await msg.answer("❌ Video fayli topilmadi yoki noto‘g‘ri ID.")
         return
 
     try:
-        # Yuklab olish hisobini yangilash (bazada)
+        # 🔹 Yuklab olish hisobini yangilash
         new_download_count = download_count + 1
         with sqlite3.connect('kinosaroy1bot.db') as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE movies SET download_count = ? WHERE movie_code = ?", (new_download_count, movie_code))
             conn.commit()
 
-        # Inline tugmalarni yangilash
         inline = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(
-                        text="Do'stlarga yuborish",
-                        switch_inline_query=f"{movie_code}"  # movie_code ni yuborish
-                    ),
-                    InlineKeyboardButton(
-                        text="📥 Saqlash", callback_data=f"save_movie:{movie_code}"  # Callbackda movie_codeni berish
-                    )
+                    InlineKeyboardButton(text="Do‘stlarga yuborish", switch_inline_query=f"{movie_code}"),
+                    InlineKeyboardButton(text="📥 Saqlash", callback_data=f"save_movie:{movie_code}")
                 ],
                 [
-                    InlineKeyboardButton(
-                        text="🛒 Saqlanganlar", callback_data="kor_kino"
-                    )
-                    
+                    InlineKeyboardButton(text="🛒 Saqlanganlar", callback_data="kor_kino")
                 ],
                 [
-                    InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")
+                    InlineKeyboardButton(text="🔍Nom orqali qidirish...", switch_inline_query_current_chat="")
                 ]
             ],
             row_width=2
         )
 
-        # Videoni yuborish
         await bot.send_video(
             chat_id=msg.chat.id,
             video=video_file_id,
@@ -2005,12 +2469,9 @@ async def check_movie_code(msg: Message, state: FSMContext):
             reply_markup=inline,
             parse_mode="HTML"
         )
-        
+
     except aiogram.utils.exceptions.WrongFileIdentifier:
-        await msg.answer("❌ Noto'g'ri video fayli yoki ID. Iltimos, ma'lumotlarni yangilang.")
-
-
-
+        await msg.answer("❌ Noto‘g‘ri video fayli yoki ID. Iltimos, ma‘lumotlarni yangilang.")
 
 
 @dp.callback_query_handler(lambda c: c.data == "top_movies",state="*")
@@ -2095,7 +2556,7 @@ async def send_movie_from_top(callback_query: types.CallbackQuery):
                     ),
                     
                 ],
-                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat="")]
+                [InlineKeyboardButton(text="🔍Nom orqali qidirish...", switch_inline_query_current_chat="")]
             ],
             row_width=2
         )
@@ -2321,7 +2782,7 @@ async def cancel_action(callback_query: types.CallbackQuery,state:FSMContext):
              inline_keyboard=[
                 [InlineKeyboardButton(text="🎥 Top Filmlar Kanali", url="https://t.me/+SM0BNsff0QtmMDUy"),
                  InlineKeyboardButton(text="🗒 Kategoriya",callback_data="name_search")],
-                [InlineKeyboardButton(text="🔍Kino qidirish...", switch_inline_query_current_chat=""),
+                [InlineKeyboardButton(text="🔍Nom orqali qidirish...", switch_inline_query_current_chat=""),
                  InlineKeyboardButton(text="Top 10 Filmlar", callback_data="top_movies")],
                 [InlineKeyboardButton(
                         text="🛒 Saqlanganlar", callback_data="kor_kino"
