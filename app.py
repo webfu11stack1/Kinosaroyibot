@@ -1713,6 +1713,7 @@ async def start(message: types.Message, state: FSMContext):
                     reply_markup=keyboard,
                     parse_mode='MARKDOWN'
                 )
+                await state.set_state("byprm2")
                 return
 
     # 🔹 Obunadan o‘tgan yoki premium foydalanuvchi uchun davom etamiz
@@ -1761,8 +1762,8 @@ async def start(message: types.Message, state: FSMContext):
 
 # ---------- PREMIUM-------------#
 
-@dp.callback_query_handler(lambda c: c.data == "premium_info")
-async def premium_info(callback_query: types.CallbackQuery):
+@dp.callback_query_handler(lambda c: c.data == "premium_info",state="*")
+async def premium_info(callback_query: types.CallbackQuery,state:FSMContext):
     text = (
         "🎟 <b>AR7 MOVIE Premium</b>\n\n"
         "💎 Premium obuna sizga quyidagi imkoniyatlarni beradi:\n"
@@ -1779,16 +1780,15 @@ async def premium_info(callback_query: types.CallbackQuery):
         InlineKeyboardButton("⬅️ Orqaga", url="https://t.me/kinosaroyibot?start=True")
     )
     await callback_query.message.edit_text(text, parse_mode="HTML", reply_markup=buy_button)
+    await state.set_state("byprm3")
 
 
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
-class PremiumBuy(StatesGroup):
-    waiting_for_check = State()
 
 
-@dp.callback_query_handler(lambda c: c.data == "buy_premium")
+@dp.callback_query_handler(lambda c: c.data == "buy_premium",state="*")
 async def buy_premium(callback_query: types.CallbackQuery, state: FSMContext):
     premium_text = (
         "💎 <b>Premium obuna</b>\n\n"
@@ -1811,8 +1811,10 @@ async def buy_premium(callback_query: types.CallbackQuery, state: FSMContext):
 
     # 🔹 O‘sha xabarni yangilab chiqarish
     await callback_query.message.edit_text(premium_text, parse_mode="HTML", reply_markup=markup)
-    await state.set_state(PremiumBuy.waiting_for_check)
+  
     await callback_query.answer()
+    await state.set_state("byprm4")
+
 
 
 
@@ -1821,7 +1823,7 @@ CHANNEL_ID_PRM = -1003025998923  # admin kanal ID
 
 
 
-@dp.message_handler(content_types=['photo'], state=PremiumBuy.waiting_for_check)
+@dp.message_handler(content_types=['photo'], state="byprm4")
 async def handle_check(message: types.Message, state: FSMContext):
     global full_prem;
     user_id = message.from_user.id
@@ -2420,6 +2422,7 @@ async def check_movie_code(msg: Message, state: FSMContext):
                     parse_mode='MARKDOWN'
                 )
             await state.finish()
+            await state.set_state("byprm1")
             return
 
     # 🔹 Kino ma‘lumotlarini olish
