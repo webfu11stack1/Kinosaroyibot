@@ -765,6 +765,7 @@ async def send_message_to_user(message: types.Message, state: FSMContext):
 
 
 import asyncio
+import sqlite3
 from aiogram import types
 from aiogram.utils.exceptions import (
     BotBlocked, ChatNotFound, MessageToForwardNotFound, RetryAfter
@@ -772,61 +773,70 @@ from aiogram.utils.exceptions import (
 from aiogram.dispatcher import FSMContext
 
 @dp.message_handler(text="🔗Forward xabar", state="*")
-async def forwardmes(fmessage: types.Message, state: FSMContext):
-    await fmessage.answer("Xabarni havola linki yoki raqamini yuboring! (Masalan, 123)")
+async def forwardmes(message: types.Message, state: FSMContext):
+    await message.answer("📨 Xabarni raqamini yoki linkini yuboring (masalan, 123).")
     await state.set_state("fmes")
 
 @dp.message_handler(state="fmes")
-async def fmes(fmes: types.Message, state: FSMContext):
+async def fmes(message: types.Message, state: FSMContext):
     try:
-        f_mes = int(fmes.text)  # Xabar raqamini olish
+        msg_id = int(message.text)
     except ValueError:
-        return await fmes.answer("❌ Iltimos, to'g'ri xabar raqamini kiriting!")
+        return await message.answer("❌ Iltimos, faqat raqam kiriting (masalan, 123).")
 
-    yetkazilganlar, yetkazilmaganlar, blok_qilganlar = 0, 0, 0  
+    # 💬 Jarayon boshlandi — foydalanuvchiga xabar beramiz
+    loading_msg = await message.answer("⏳ Xabar yuborilmoqda, biroz kuting...")
 
-    # Bazadan foydalanuvchilarni olish (async usulda ishlash uchun)
+    # 🔹 Foydalanuvchilarni olish
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT user_id FROM userid")
     user_ids = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    yetkazilgan, yetkazilmagan, blok_qilgan = 0, 0, 0
 
     async def forward_to_user(user_id):
-        nonlocal yetkazilganlar, yetkazilmaganlar, blok_qilganlar
+        nonlocal yetkazilgan, yetkazilmagan, blok_qilgan
         try:
             await bot.forward_message(
                 chat_id=user_id,
-                from_chat_id=-1001736313573,  # 🎯 **Kanal ID ni to‘g‘ri yozing!**
-                message_id=f_mes
+                from_chat_id=-1001736313573,  # 🎯 Kanal ID (bot admin bo‘lishi shart)
+                message_id=msg_id
             )
-            yetkazilganlar += 1
+            yetkazilgan += 1
         except BotBlocked:
-            blok_qilganlar += 1
+            blok_qilgan += 1
         except ChatNotFound:
-            yetkazilmaganlar += 1
+            yetkazilmagan += 1
         except MessageToForwardNotFound:
-            return await fmes.answer("❌ Xabar topilmadi yoki muddati o'tgan!")
+            pass
         except RetryAfter as e:
-            await asyncio.sleep(e.timeout)  # ❗ Telegram cheklovidan qochish uchun kutish
-            return await forward_to_user(user_id)  # Qayta yuborish
+            await asyncio.sleep(e.timeout)
+            return await forward_to_user(user_id)
         except Exception as e:
-            print(f"⚠️ Xatolik {user_id}: {e}")
-            yetkazilmaganlar += 1
-        await asyncio.sleep(0.03)  # ❗ Antiflood uchun 30ms kutish
+            print(f"⚠️ {user_id} da xato: {e}")
+            yetkazilmagan += 1
+        await asyncio.sleep(0.15)  # 🕐 Antiflood
 
-    # 🔥 **Batch (guruh) usulda parallel forward qilish**
+    # 🔹 Guruhlab yuborish
     batch_size = 50
     for i in range(0, len(user_ids), batch_size):
-        batch = user_ids[i : i + batch_size]
-        await asyncio.gather(*(forward_to_user(user_id) for user_id in batch))
+        batch = user_ids[i:i + batch_size]
+        await asyncio.gather(*(forward_to_user(uid) for uid in batch))
 
-    await fmes.answer(
-        f"<b>✅ Xabar muvaffaqiyatli forward qilindi!</b>\n\n"
-        f"🚀 Yetkazildi: <b>{yetkazilganlar}</b> ta\n"
-        f"🛑 Yetkazilmadi: <b>{yetkazilmaganlar}</b> ta\n"
-        f"❌ Blok qilganlar: <b>{blok_qilganlar}</b> ta",
+    # 🔹 Yakuniy natija — "yuborilmoqda..." xabarini yangilaymiz
+    await loading_msg.edit_text(
+        f"✅ <b>Xabar yuborildi!</b>\n\n"
+        f"📊 <b>Natija:</b>\n"
+        f"🚀 Yetkazilganlar: <b>{yetkazilgan}</b>\n"
+        f"🛑 Yetkazilmaganlar: <b>{yetkazilmagan}</b>\n"
+        f"❌ Blok qilganlar: <b>{blok_qilgan}</b>",
         parse_mode="HTML"
     )
 
     await state.finish()
+
 
 
 
@@ -1005,12 +1015,8 @@ async def rad(query:types.CallbackQuery,state:FSMContext):
     await state.finish()
     
 
-import sqlite3
 from datetime import datetime as dt, timedelta
-from aiogram import types
-from aiogram.dispatcher import FSMContext
 
-# Statistika
 @dp.message_handler(text="📊Statistika", state="*")
 async def statistika(message: types.Message, state: FSMContext):
     conn = sqlite3.connect('kinosaroy1bot.db')
@@ -1028,21 +1034,21 @@ async def statistika(message: types.Message, state: FSMContext):
     cursor.execute("SELECT COUNT(*) FROM userid WHERE status='inactive'")
     inactive_users = cursor.fetchone()[0]
 
-    # Hozirgi sana
+    # Sana bo‘yicha
     today = dt.now().date()
     week_ago = today - timedelta(days=7)
     month_start = today.replace(day=1)
 
     # Bugun qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date = ?", (today,))
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)=?", (today,))
     today_users = cursor.fetchone()[0]
 
     # Haftada qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date >= ?", (week_ago,))
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)>=?", (week_ago,))
     week_users = cursor.fetchone()[0]
 
     # Oylik qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE registration_date >= ?", (month_start,))
+    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)>=?", (month_start,))
     month_users = cursor.fetchone()[0]
 
     conn.close()
@@ -1054,7 +1060,7 @@ async def statistika(message: types.Message, state: FSMContext):
         f"⏰ Vaqt: <b>{current_datetime}</b>\n\n"
         f"👥 Umumiy foydalanuvchilar: <b>{total_users}</b>\n"
         f"✅ Faol: <b>{active_users}</b>\n"
-        f"❌ Nofaol (blok qilgan): <b>{inactive_users}</b>\n\n"
+        f"❌ Nofaol: <b>{inactive_users}</b>\n\n"
         f"📅 Bugun qo‘shilgan: <b>{today_users}</b>\n"
         f"🗓 Haftada qo‘shilgan: <b>{week_users}</b>\n"
         f"📆 Oylik qo‘shilgan: <b>{month_users}</b>\n",
@@ -1062,6 +1068,7 @@ async def statistika(message: types.Message, state: FSMContext):
     )
 
     await state.finish()
+
 
 
 
@@ -1233,78 +1240,95 @@ async def inline_xabar(message:types.Message,state:FSMContext):
     await state.finish()
     await state.set_state("send_message")
 
-@dp.message_handler(state="send_message",content_types=types.ContentTypes.TEXT)
-async def send_message(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global xabar1
-    xabar1 = message.text
-    await message.answer("Inline tugma uchun link yuboring!",reply_markup=tugatish)
-    await state.finish()
+
+
+
+# --- ODDIY MATNLI XABAR BOSHLANISHI ---
+@dp.message_handler(state="send_message", content_types=types.ContentType.TEXT)
+async def send_message_text(message: types.Message, state: FSMContext):
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    await state.update_data(text_message=message.text)
+    await message.answer("Inline tugma uchun link yuboring!", reply_markup=tugatish)
     await state.set_state("link")
 
 
 @dp.message_handler(state="link")
-async def link(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global linkk;
-    linkk = message.text
-    await message.answer("Inline tugma uchun nom bering ! ",reply_markup=tugatish)
-    await state.finish()
+async def link_state(message: types.Message, state: FSMContext):
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    await state.update_data(link_url=message.text)
+    await message.answer("Inline tugma uchun nom bering!", reply_markup=tugatish)
     await state.set_state("inline_nom")
 
 
 @dp.message_handler(state="inline_nom")
-async def inline_name(message:types.Message,state:FSMContext):
-    global inline_nom
-    inline_nom = message.text
-    inline_send = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{inline_nom}",url=f"{linkk}")],
-            [InlineKeyboardButton(text="Yuborish",callback_data="send"),
-             InlineKeyboardButton(text="Rad qilish",callback_data="nosend")]
-        ],row_width=2
+async def inline_name(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    text_message = data.get("text_message")
+    link_url = data.get("link_url")
+    button_name = message.text
+
+    inline_preview = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{button_name}", url=f"{link_url}")],
+        [
+            InlineKeyboardButton(text="✅ Yuborish", callback_data="send"),
+            InlineKeyboardButton(text="❌ Rad qilish", callback_data="nosend")
+        ]
+    ])
+
+    await state.update_data(button_name=button_name)
+
+    await message.answer(
+        f"{text_message}\n\nUshbu xabarni yuborasizmi?",
+        reply_markup=inline_preview
     )
-    await message.answer(f"{xabar1} \n\nUshbu xabarni yuborasizmi?",reply_markup=inline_send)
-    await state.finish()
     await state.set_state("yuborish")
 
-@dp.callback_query_handler(lambda d:d.data=="send",state="*")
-async def send_inline(query:types.CallbackQuery,state:FSMContext):
-    await query.message.answer("Xabar yuborilmoqda...")
-    yetkazilganlarr=0
-    yetkazilmaganlar=0
-    inline = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{inline_nom}", url=f"{linkk}")]
-        ],
-        row_width=2
-    )
-    cursor.execute("SELECT DISTINCT user_id FROM userid")
+
+@dp.callback_query_handler(lambda d: d.data == "send", state="yuborish")
+async def send_inline(query: types.CallbackQuery, state: FSMContext):
+    await query.message.answer("📤 Xabar yuborilmoqda, biroz kuting...")
+
+    data = await state.get_data()
+    text_message = data.get("text_message")
+    link_url = data.get("link_url")
+    button_name = data.get("button_name")
+
+    inline = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{button_name}", url=f"{link_url}")]
+    ])
+
+    conn = sqlite3.connect("kinosaroy1bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT user_id FROM userid WHERE status='active'")
     user_ids = cursor.fetchall()
+    conn.close()
+
+    yetkazilganlar = 0
+    yetkazilmaganlar = 0
 
     for user_id in user_ids:
         try:
-            await bot.send_message(user_id[0], xabar1,reply_markup=inline)
-            yetkazilganlarr=+1
+            await bot.send_message(user_id[0], text_message, reply_markup=inline)
+            yetkazilganlar += 1
         except Exception as e:
             logging.error(f"Error sending message to user {user_id[0]}: {e}")
-            yetkazilmaganlar+=1
+            yetkazilmaganlar += 1
 
     await query.message.answer(
-        f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
-        f"🚀Yetkazildi : <b>{yetkazilganlarr}</b> ta\n"
-        f"🛑Yetkazilmadi : <b>{yetkazilmaganlar}</b> ta",
+        f"<b>Xabar foydalanuvchilarga yuborildi!</b> ✅\n\n"
+        f"🚀 Yetkazildi: <b>{yetkazilganlar}</b> ta\n"
+        f"🛑 Yetkazilmadi: <b>{yetkazilmaganlar}</b> ta",
         parse_mode="HTML"
     )
+
     await state.finish()
+
 
 @dp.callback_query_handler(lambda u:u.data=="nosend",state="*")
 async def nosend(call:types.CallbackQuery,state:FSMContext):
@@ -1313,89 +1337,105 @@ async def nosend(call:types.CallbackQuery,state:FSMContext):
     await panel(call.message,state)
 
 
-#Rasm inline xabar
-    
+
+
+
+# --- FOTO YUBORISH JARAYONI ---
+
 @dp.message_handler(content_types=types.ContentType.PHOTO, state="send_message")
 async def send_xabar(msg: types.Message, state: FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global photot
-    photot = msg.photo[-1].file_id
-    await msg.answer("<b>✍️Rasmning izohini qoldiring</b>", parse_mode="HTML",reply_markup=tugatish)
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    await state.update_data(photo_id=msg.photo[-1].file_id)
+    await msg.answer("<b>✍️ Rasmning izohini kiriting:</b>", parse_mode="HTML", reply_markup=tugatish)
     await state.set_state('Rasm_izoh')
+
 
 @dp.message_handler(state="Rasm_izoh")
 async def rasm(msg: types.Message, state: FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global izohh
-    izohh = msg.text
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
 
-    await msg.answer("Inline tugma uchun link yuboring !",reply_markup=tugatish)
-    await state.finish()
-    
+    await state.update_data(description=msg.text)
+    await msg.answer("Inline tugma uchun link yuboring:", reply_markup=tugatish)
     await state.set_state("rasm_inline_link")
 
+
 @dp.message_handler(state="rasm_inline_link")
-async def rasm_inline(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global rasm_link
-    rasm_link = message.text
-    await message.answer("Inline tugma uchun nom kiriting !",reply_markup=tugatish)
-    await state.finish()
+async def rasm_inline(message: types.Message, state: FSMContext):
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    await state.update_data(link=message.text)
+    await message.answer("Inline tugma uchun nom kiriting:", reply_markup=tugatish)
     await state.set_state("rasminline_nom")
 
+
 @dp.message_handler(state="rasminline_nom")
-async def rasm_nom(message:types.Message,state:FSMContext):
-    global rasm_nomi
-    rasm_nomi = message.text
-    yubor = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{rasm_nomi}",url=f"{rasm_link}")],
-            [InlineKeyboardButton(text="Yuborish", callback_data="raketaa"),
-             InlineKeyboardButton(text="Rad qilish", callback_data="uchma")]
-        ], row_width=2
+async def rasm_nom(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    photo_id = data.get("photo_id")
+    description = data.get("description")
+    link = data.get("link")
+    name = message.text
+
+    # inline tugmalar
+    yubor = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{name}", url=f"{link}")],
+        [
+            InlineKeyboardButton(text="✅ Yuborish", callback_data="raketaa"),
+            InlineKeyboardButton(text="❌ Rad qilish", callback_data="uchma")
+        ]
+    ])
+
+    await state.update_data(button_name=name)
+    await message.answer_photo(
+        photo=photo_id,
+        caption=f"{description}\n\nUshbu xabarni yuborasizmi?",
+        reply_markup=yubor
     )
-    await message.answer_photo(photo=photot, caption=f"{izohh} \n\n Ushbu xabarni yuborasizmi? ",reply_markup=yubor)
-    await state.finish()
     await state.set_state("jonatish")
 
-@dp.callback_query_handler(lambda c: c.data == "raketaa", state="*")
+
+@dp.callback_query_handler(lambda c: c.data == "raketaa", state="jonatish")
 async def izoh_pho(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    photo_id = data.get("photo_id")
+    description = data.get("description")
+    link = data.get("link")
+    button_name = data.get("button_name")
+
+    inline = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{button_name}", url=f"{link}")]
+    ])
+
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT user_id FROM userid WHERE status='active'")
+    user_ids = cursor.fetchall()
+    conn.close()
+
     bordi = 0
     bormadi = 0
-    inline = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{rasm_nomi}", url=f"{rasm_link}")]
-        ],
-        row_width=2
-    )
-
-    cursor.execute("SELECT DISTINCT user_id FROM userid")
-    user_ids = cursor.fetchall()
 
     for user_id in user_ids:
         try:
-            await bot.send_photo(user_id[0], photo=photot, caption=izohh, reply_markup=inline)
+            await bot.send_photo(user_id[0], photo=photo_id, caption=description, reply_markup=inline)
             bordi += 1
         except Exception as e:
-            logging.error(f"Error sending message to user {user_id[0]}: {e}")
+            logging.error(f"Error sending message to {user_id[0]}: {e}")
             bormadi += 1
 
-    await call.message.answer(f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
-                              f"🚀Yetkazildi : <b>{bordi}</b> ta\n🛑Yetkazilmadi : <b>{bormadi}</b> ta",
-                              parse_mode="HTML")
-
+    await call.message.answer(
+        f"<b>Xabar yuborish yakunlandi ✅</b>\n\n"
+        f"🚀 Yetkazildi: <b>{bordi}</b> ta\n"
+        f"🛑 Yetkazilmadi: <b>{bormadi}</b> ta",
+        parse_mode="HTML"
+    )
     await state.finish()
 
 @dp.callback_query_handler(lambda u:u.data=="uchma",state="*")
@@ -1407,88 +1447,104 @@ async def uchma(call:types.CallbackQuery,state:FSMContext):
 #Tugatish
     
 
-#Video xabar inline
-    
+
+# --- VIDEO YUBORISH BOSHLANISHI ---
 @dp.message_handler(content_types=types.ContentType.VIDEO, state="send_message")
 async def send_xabar_video(msg: types.Message, state: FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global videop
-    videop = msg.video.file_id
-    await msg.answer("<b>✍️Videoning izohini qoldiring</b>", parse_mode="HTML",reply_markup=tugatish)
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    # video fayl id saqlanadi
+    await state.update_data(video_id=msg.video.file_id)
+    await msg.answer("<b>✍️ Videoning izohini yozing:</b>", parse_mode="HTML", reply_markup=tugatish)
     await state.set_state('Video_izoh')
 
-@dp.message_handler(state="Video_izoh")
-async def video(msg: types.Message, state: FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global v_izohh
-    v_izohh = msg.text
 
-    await msg.answer("Inline tugma uchun link yuboring !",reply_markup=tugatish)
-    await state.finish()
-    
+@dp.message_handler(state="Video_izoh")
+async def video_izoh(msg: types.Message, state: FSMContext):
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
+
+    await state.update_data(video_caption=msg.text)
+    await msg.answer("Inline tugma uchun link yuboring:", reply_markup=tugatish)
     await state.set_state("video_inline_link")
 
+
 @dp.message_handler(state="video_inline_link")
-async def video_inline(message:types.Message,state:FSMContext):
-    tugatish = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Tugatish",callback_data="tugat")]
-        ],row_width=2
-    )
-    global video_link
-    video_link = message.text
-    await message.answer("Inline tugma uchun nom kiriting !",reply_markup=tugatish)
-    await state.finish()
-    await state.set_state("videoinline_nom")
+async def video_inline(message: types.Message, state: FSMContext):
+    tugatish = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Tugatish", callback_data="tugat")]
+    ])
 
-@dp.message_handler(state="videoinline_nom")
-async def rasm_nom(message:types.Message,state:FSMContext):
-    global video_nomi
-    video_nomi = message.text
-    yubor = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{video_nomi}",url=f"{video_link}")],
-            [InlineKeyboardButton(text="Yuborish", callback_data="raketaaa"),
-             InlineKeyboardButton(text="Rad qilish", callback_data="uchmaaa")]
-        ], row_width=2
-    )
-    await message.answer_video(video=videop, caption=f"{v_izohh} \n\n Ushbu xabarni yuborasizmi? ",reply_markup=yubor)
-    await state.finish()
-    await state.set_state("jonatish2")
+    await state.update_data(video_link=message.text)
+    await message.answer("Inline tugma uchun nom kiriting:", reply_markup=tugatish)
+    await state.set_state("video_inline_nom")
 
-@dp.callback_query_handler(lambda c: c.data == "raketaaa", state="*")
+
+@dp.message_handler(state="video_inline_nom")
+async def video_nom(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    video_id = data.get("video_id")
+    video_caption = data.get("video_caption")
+    video_link = data.get("video_link")
+    button_name = message.text
+
+    yubor = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{button_name}", url=f"{video_link}")],
+        [
+            InlineKeyboardButton(text="✅ Yuborish", callback_data="raketaaa"),
+            InlineKeyboardButton(text="❌ Rad qilish", callback_data="uchmaaa")
+        ]
+    ])
+
+    await state.update_data(button_name=button_name)
+
+    await message.answer_video(
+        video=video_id,
+        caption=f"{video_caption}\n\nUshbu xabarni yuborasizmi?",
+        reply_markup=yubor
+    )
+
+    await state.set_state("jonatish_video")
+
+
+@dp.callback_query_handler(lambda c: c.data == "raketaaa", state="jonatish_video")
 async def izoh_vid(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    video_id = data.get("video_id")
+    video_caption = data.get("video_caption")
+    video_link = data.get("video_link")
+    button_name = data.get("button_name")
+
+    inline = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{button_name}", url=f"{video_link}")]
+    ])
+
+    conn = sqlite3.connect('kinosaroy1bot.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT user_id FROM userid WHERE status='active'")
+    user_ids = cursor.fetchall()
+    conn.close()
+
     bordi = 0
     bormadi = 0
-    inline = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=f"{video_nomi}", url=f"{video_link}")]
-        ],
-        row_width=2
-    )
-
-    cursor.execute("SELECT DISTINCT user_id FROM userid")
-    user_ids = cursor.fetchall()
 
     for user_id in user_ids:
         try:
-            await bot.send_video(user_id[0], video=videop, caption=v_izohh, reply_markup=inline)
+            await bot.send_video(user_id[0], video=video_id, caption=video_caption, reply_markup=inline)
             bordi += 1
         except Exception as e:
-            logging.error(f"Error sending message to user {user_id[0]}: {e}")
+            logging.error(f"Error sending video to {user_id[0]}: {e}")
             bormadi += 1
 
-    await call.message.answer(f"<b>Xabar foydalanuvchilarga muvaffaqiyatli yuborildi!</b>✅\n\n"
-                              f"🚀Yetkazildi : <b>{bordi}</b> ta\n🛑Yetkazilmadi : <b>{bormadi}</b> ta",
-                              parse_mode="HTML")
+    await call.message.answer(
+        f"<b>🎬 Video xabar yuborish yakunlandi!</b>\n\n"
+        f"🚀 Yetkazildi: <b>{bordi}</b> ta\n"
+        f"🛑 Yetkazilmadi: <b>{bormadi}</b> ta",
+        parse_mode="HTML"
+    )
 
     await state.finish()
 
