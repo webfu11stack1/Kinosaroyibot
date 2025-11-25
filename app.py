@@ -399,94 +399,114 @@ async def remove_premium_user(message: types.Message, state: FSMContext):
 
     await state.set_state("premium_menu")
 
-# import sqlite3
-# from aiogram import types
-# from aiogram.dispatcher import FSMContext
-# from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
-# # --- PREMIUM USERLARNI OLISH FUNKSIYASI ---
-# def get_premium_users(page: int, limit: int = 10):
-#     conn = sqlite3.connect("kinosaroy1bot.db")
-#     cursor = conn.cursor()
-
-#     # offset hisoblash
-#     offset = page * limit
-
-#     # limit va offset validligini tekshirish
-#     if page < 0:
-#         page = 0
-#         offset = 0
-
-#     cursor.execute(
-#         "SELECT user_id, full_name, end_date FROM premium_users ORDER BY end_date DESC LIMIT ? OFFSET ?",
-#         (limit, offset)
-#     )
-#     users = cursor.fetchall()
-
-#     # Sahifalar sonini hisoblash
-#     cursor.execute("SELECT COUNT(*) FROM premium_users")
-#     total_users = cursor.fetchone()[0] or 0
-#     total_pages = (total_users + limit - 1) // limit if total_users > 0 else 1
-
-#     conn.close()
-#     return users, total_pages, total_users
-
-
-# # --- SAHIFA O‘ZGARTIRISH TUGMALARI ---
-# def generate_nav_markup(page: int, total_pages: int):
-#     markup = InlineKeyboardMarkup(row_width=2)
-#     buttons = []
-
-#     # prev tugma
-#     if page > 0:
-#         buttons.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"premium_prev_{page-1}"))
-#     # next tugma
-#     if page < total_pages - 1:
-#         buttons.append(InlineKeyboardButton("➡️ Keyingi", callback_data=f"premium_next_{page+1}"))
-
-#     # Hozirgi sahifa ko'rsatish (faqat info sifatida)
-#     buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="premium_page_info"))
-
-#     markup.add(*buttons)
-#     return markup
-
 import sqlite3
-import pandas as pd
 from aiogram import types
-from io import BytesIO
+from aiogram.dispatcher import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# --- Handler: Premiumlar ro'yxati / Excel fayl ---
-@dp.message_handler(lambda msg: msg.text == "📋 Premiumlar ro‘yxati")
-async def send_premium_excel(message: types.Message):
-    # --- Baza bilan bog'lanamiz ---
+# --- PREMIUM USERLARNI OLISH FUNKSIYASI ---
+def get_premium_users(page: int, limit: int = 10):
     conn = sqlite3.connect("kinosaroy1bot.db")
     cursor = conn.cursor()
 
-    cursor.execute("SELECT user_id, full_name, added_time FROM premium_users ORDER BY added_time DESC")
-    data = cursor.fetchall()
-    conn.close()
+    # offset hisoblash
+    offset = page * limit
 
-    if not data:
+    # limit va offset validligini tekshirish
+    if page < 0:
+        page = 0
+        offset = 0
+
+    cursor.execute(
+        "SELECT user_id, full_name, end_date FROM premium_users ORDER BY end_date DESC LIMIT ? OFFSET ?",
+        (limit, offset)
+    )
+    users = cursor.fetchall()
+
+    # Sahifalar sonini hisoblash
+    cursor.execute("SELECT COUNT(*) FROM premium_users")
+    total_users = cursor.fetchone()[0] or 0
+    total_pages = (total_users + limit - 1) // limit if total_users > 0 else 1
+
+    conn.close()
+    return users, total_pages, total_users
+
+
+# --- SAHIFA O‘ZGARTIRISH TUGMALARI ---
+def generate_nav_markup(page: int, total_pages: int):
+    markup = InlineKeyboardMarkup(row_width=2)
+    buttons = []
+
+    # prev tugma
+    if page > 0:
+        buttons.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"premium_prev_{page-1}"))
+    # next tugma
+    if page < total_pages - 1:
+        buttons.append(InlineKeyboardButton("➡️ Keyingi", callback_data=f"premium_next_{page+1}"))
+
+    # Hozirgi sahifa ko'rsatish (faqat info sifatida)
+    buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="premium_page_info"))
+
+    markup.add(*buttons)
+    return markup
+
+
+# --- PREMIUMLARNI KO‘RSATISH HANDLER ---
+@dp.message_handler(lambda msg: msg.text == "📋 Premiumlar ro‘yxati", state="premium_menu")
+async def show_premium_users(message: types.Message, state: FSMContext):
+    page = 0
+    limit = 10
+    users, total_pages, total_users = get_premium_users(page, limit=limit)
+
+    if not users:
         await message.answer("❌ Hozircha premium foydalanuvchilar yo‘q.")
         return
 
-    # --- Jadvalni yaratish ---
-    table_data = []
-    for i, (user_id, full_name, added_time) in enumerate(data, start=1):
-        full_name = full_name if full_name else f"User {user_id}"
-        added_dt = pd.to_datetime(added_time)
-        end_dt = added_dt + pd.Timedelta(days=30)
-        table_data.append([i, user_id, full_name, added_dt.strftime("%Y-%m-%d %H:%M"), end_dt.strftime("%Y-%m-%d %H:%M")])
+    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
+    start_index = page * limit + 1
+    for i, (user_id, full_name, end_date) in enumerate(users, start=start_index):
+        # full_name bo'lmasa fallback
+        name = full_name if full_name else f"User {user_id}"
+        text += f"{i}. <a href='tg://user?id={user_id}'>{name}</a> — {end_date}\n"
 
-    df = pd.DataFrame(table_data, columns=["№", "User ID", "Foydalanuvchi ismi", "Boshlanish", "Tugash"])
+    markup = generate_nav_markup(page, total_pages)
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
-    # --- Excel faylni xotirada yaratish ---
-    excel_file = BytesIO()
-    df.to_excel(excel_file, index=False, engine='openpyxl')
-    excel_file.seek(0)
 
-    # --- Foydalanuvchiga yuborish ---
-    await message.answer_document(types.InputFile(excel_file, filename="Premium_users.xlsx"))
+# --- SAHIFA TUGMALARINI QAYTA ISHLASH ---
+@dp.callback_query_handler(lambda c: c.data and ("premium_prev_" in c.data or "premium_next_" in c.data))
+async def change_page(call: types.CallbackQuery):
+    await call.answer()  # spinnerni o'chirish
+
+    try:
+        parts = call.data.split("_")
+        page = int(parts[-1])
+    except:
+        await call.message.answer("⚠️ Callback data noto‘g‘ri.")
+        return
+
+    limit = 10
+    users, total_pages, total_users = get_premium_users(page, limit=limit)
+
+    # Sahifa raqami chegarasini tekshirish
+    if page < 0:
+        page = 0
+    if page >= total_pages:
+        page = total_pages - 1
+
+    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
+    start_index = page * limit + 1
+    for i, (user_id, full_name, end_date) in enumerate(users, start=start_index):
+        name = full_name if full_name else f"User {user_id}"
+        text += f"{i}. <a href='tg://user?id={user_id}'>{name}</a> — {end_date}\n"
+
+    markup = generate_nav_markup(page, total_pages)
+
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except:
+        # edit_text ishlamasa reply bilan jo'natamiz
+        await call.message.reply(text, parse_mode="HTML", reply_markup=markup)
 
 
 # --- ORQAGA QAYTISH ---
