@@ -474,33 +474,25 @@ async def show_premium_users(message: types.Message, state: FSMContext):
 
 
 # --- SAHIFA TUGMALARINI QAYTA ISHLASH ---
-@dp.callback_query_handler(lambda c: c.data and c.data.startswith(("premium_prev_", "premium_next_")))
+@dp.callback_query_handler(lambda c: c.data and ("premium_prev_" in c.data or "premium_next_" in c.data))
 async def change_page(call: types.CallbackQuery):
-    # spinnerni darhol o'chirish (foydalanuvchi uchun tez feedback)
-    await call.answer()
+    await call.answer()  # spinnerni o'chirish
 
-    data = call.data  # misol: "premium_next_2" yoki "premium_prev_0"
-    parts = data.split("_")
-    # Oxirgi element sahifa raqami bo'lishi kerak
     try:
+        parts = call.data.split("_")
         page = int(parts[-1])
-    except (ValueError, IndexError):
-        # noto'g'ri callback data kelsa, hech narsa qilmaymiz
-        await call.message.answer("⚠️ Sahifa ma'lumotida xatolik yuz berdi.")
+    except:
+        await call.message.answer("⚠️ Callback data noto‘g‘ri.")
         return
 
     limit = 10
     users, total_pages, total_users = get_premium_users(page, limit=limit)
 
-    # Agar sahifa noto'g'ri bo'lsa — revert qilish
-    if page < 0 or page >= total_pages:
-        # oddiygina qayta render qilamiz: hozirgi sahifa va tugmalar
-        markup = generate_nav_markup(max(0, min(page, total_pages-1)), total_pages)
-        try:
-            await call.message.edit_reply_markup(reply_markup=markup)
-        except:
-            pass
-        return
+    # Sahifa raqami chegarasini tekshirish
+    if page < 0:
+        page = 0
+    if page >= total_pages:
+        page = total_pages - 1
 
     text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
     start_index = page * limit + 1
@@ -510,15 +502,11 @@ async def change_page(call: types.CallbackQuery):
 
     markup = generate_nav_markup(page, total_pages)
 
-    # Habarni edit qilish: ba'zi hollarda edit_text ishlamay qoladi, shuning uchun try/except qo'ydim
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
-    except Exception as e:
-        # Agar edit_text xato bersa, yangidan javob beramiz
-        try:
-            await call.message.reply(text, parse_mode="HTML", reply_markup=markup)
-        except:
-            pass
+    except:
+        # edit_text ishlamasa reply bilan jo'natamiz
+        await call.message.reply(text, parse_mode="HTML", reply_markup=markup)
 
 
 # --- ORQAGA QAYTISH ---
