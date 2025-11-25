@@ -1739,14 +1739,7 @@ async def process_delete_zayaf(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=["start"], state="*")
 async def start(message: types.Message, state: FSMContext):
-    markup = InlineKeyboardMarkup()
-
-    premium_btn = InlineKeyboardButton(
-        text="💎Premium ",
-        callback_data="premium_menu"
-    )
-
-    markup.add(premium_btn)
+    
     user_id = message.from_user.id
     user_name_full = message.from_user.full_name
     movie_name = None
@@ -1897,8 +1890,8 @@ async def start(message: types.Message, state: FSMContext):
         await bot.send_message(
             chat_id=message.chat.id,
             text="Assalomu alaykum, Botimizga xush kelibsiz!\n\nKino kodini jo'nating! ✍️",
-            parse_mode="MARKDOWN",
-            reply_markup=markup
+            parse_mode="MARKDOWN"
+            
              
         )
         await state.set_state("name_qidir")
