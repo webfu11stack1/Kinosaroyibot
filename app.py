@@ -1736,9 +1736,10 @@ async def process_delete_zayaf(message: types.Message, state: FSMContext):
     
     await state.finish()
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-main_menu = ReplyKeyboardMarkup(
+@dp.message_handler(commands=["start"], state="*")
+async def start(message: types.Message, state: FSMContext):
+    main_menu = ReplyKeyboardMarkup(
     keyboard=[
         
         [KeyboardButton("💎Premium")],   # << Doimiy pastda turadigan tugma
@@ -1746,8 +1747,6 @@ main_menu = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
-@dp.message_handler(commands=["start"], state="*")
-async def start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user_name_full = message.from_user.full_name
     movie_name = None
