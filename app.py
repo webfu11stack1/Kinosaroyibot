@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS userid (
 );
 ''')
 
-# Agar eski jadval allaqachon mavjud bo‘lsa va status ustuni yo‘q bo‘lsa, qo‘shib qo‘yish
+# Agar status ustuni yo‘q bo‘lsa — qo‘shish
 try:
     cursor.execute("ALTER TABLE userid ADD COLUMN status TEXT DEFAULT 'active'")
 except sqlite3.OperationalError:
@@ -47,11 +47,13 @@ CREATE TABLE IF NOT EXISTS channel (
 # Bugungi ro‘yxatdan o‘tgan foydalanuvchilar jadvali
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS userid_today (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id_tod INTEGER,
-    registration_date DATE
+    registration_date TEXT
 )
 ''')
+
+
 
 # Adminlar jadvali
 cursor.execute('''
@@ -407,7 +409,14 @@ def get_premium_users(page: int, limit: int = 10):
     conn = sqlite3.connect("kinosaroy1bot.db")
     cursor = conn.cursor()
 
+    # offset hisoblash
     offset = page * limit
+
+    # limit va offset validligini tekshirish
+    if page < 0:
+        page = 0
+        offset = 0
+
     cursor.execute(
         "SELECT user_id, full_name, end_date FROM premium_users ORDER BY end_date DESC LIMIT ? OFFSET ?",
         (limit, offset)
@@ -416,11 +425,11 @@ def get_premium_users(page: int, limit: int = 10):
 
     # Sahifalar sonini hisoblash
     cursor.execute("SELECT COUNT(*) FROM premium_users")
-    total_users = cursor.fetchone()[0]
-    total_pages = (total_users - 1) // limit + 1 if total_users > 0 else 1
+    total_users = cursor.fetchone()[0] or 0
+    total_pages = (total_users + limit - 1) // limit if total_users > 0 else 1
 
     conn.close()
-    return users, total_pages
+    return users, total_pages, total_users
 
 
 # --- SAHIFA O‘ZGARTIRISH TUGMALARI ---
@@ -428,10 +437,15 @@ def generate_nav_markup(page: int, total_pages: int):
     markup = InlineKeyboardMarkup(row_width=2)
     buttons = []
 
+    # prev tugma
     if page > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"prev_page_{page-1}"))
+        buttons.append(InlineKeyboardButton("⬅️ Oldingi", callback_data=f"premium_prev_{page-1}"))
+    # next tugma
     if page < total_pages - 1:
-        buttons.append(InlineKeyboardButton("➡️ Keyingi", callback_data=f"next_page_{page+1}"))
+        buttons.append(InlineKeyboardButton("➡️ Keyingi", callback_data=f"premium_next_{page+1}"))
+
+    # Hozirgi sahifa ko'rsatish (faqat info sifatida)
+    buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="premium_page_info"))
 
     markup.add(*buttons)
     return markup
@@ -441,34 +455,70 @@ def generate_nav_markup(page: int, total_pages: int):
 @dp.message_handler(lambda msg: msg.text == "📋 Premiumlar ro‘yxati", state="premium_menu")
 async def show_premium_users(message: types.Message, state: FSMContext):
     page = 0
-    users, total_pages = get_premium_users(page)
+    limit = 10
+    users, total_pages, total_users = get_premium_users(page, limit=limit)
 
     if not users:
         await message.answer("❌ Hozircha premium foydalanuvchilar yo‘q.")
         return
 
     text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
-    for i, (user_id, full_name, end_date) in enumerate(users, start=1):
-        text += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a> — {end_date}\n"
+    start_index = page * limit + 1
+    for i, (user_id, full_name, end_date) in enumerate(users, start=start_index):
+        # full_name bo'lmasa fallback
+        name = full_name if full_name else f"User {user_id}"
+        text += f"{i}. <a href='tg://user?id={user_id}'>{name}</a> — {end_date}\n"
 
     markup = generate_nav_markup(page, total_pages)
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
 
 # --- SAHIFA TUGMALARINI QAYTA ISHLASH ---
-@dp.callback_query_handler(lambda c: c.data.startswith(("prev_page_", "next_page_")))
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith(("premium_prev_", "premium_next_")))
 async def change_page(call: types.CallbackQuery):
-    page = int(call.data.split("_")[-1])
-    users, total_pages = get_premium_users(page)
-
-    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
-    for i, (user_id, full_name, end_date) in enumerate(users, start=1):
-        text += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a> — {end_date}\n"
-
-    markup = generate_nav_markup(page, total_pages)
-    await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    # spinnerni darhol o'chirish (foydalanuvchi uchun tez feedback)
     await call.answer()
 
+    data = call.data  # misol: "premium_next_2" yoki "premium_prev_0"
+    parts = data.split("_")
+    # Oxirgi element sahifa raqami bo'lishi kerak
+    try:
+        page = int(parts[-1])
+    except (ValueError, IndexError):
+        # noto'g'ri callback data kelsa, hech narsa qilmaymiz
+        await call.message.answer("⚠️ Sahifa ma'lumotida xatolik yuz berdi.")
+        return
+
+    limit = 10
+    users, total_pages, total_users = get_premium_users(page, limit=limit)
+
+    # Agar sahifa noto'g'ri bo'lsa — revert qilish
+    if page < 0 or page >= total_pages:
+        # oddiygina qayta render qilamiz: hozirgi sahifa va tugmalar
+        markup = generate_nav_markup(max(0, min(page, total_pages-1)), total_pages)
+        try:
+            await call.message.edit_reply_markup(reply_markup=markup)
+        except:
+            pass
+        return
+
+    text = "<b>💎 Premium foydalanuvchilar ro‘yxati:</b>\n\n"
+    start_index = page * limit + 1
+    for i, (user_id, full_name, end_date) in enumerate(users, start=start_index):
+        name = full_name if full_name else f"User {user_id}"
+        text += f"{i}. <a href='tg://user?id={user_id}'>{name}</a> — {end_date}\n"
+
+    markup = generate_nav_markup(page, total_pages)
+
+    # Habarni edit qilish: ba'zi hollarda edit_text ishlamay qoladi, shuning uchun try/except qo'ydim
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except Exception as e:
+        # Agar edit_text xato bersa, yangidan javob beramiz
+        try:
+            await call.message.reply(text, parse_mode="HTML", reply_markup=markup)
+        except:
+            pass
 
 
 # --- ORQAGA QAYTISH ---
@@ -1029,48 +1079,63 @@ async def statistika(message: types.Message, state: FSMContext):
     cursor.execute("SELECT COUNT(*) FROM userid")
     total_users = cursor.fetchone()[0]
 
-    # Faol foydalanuvchilar
+    # Faol
     cursor.execute("SELECT COUNT(*) FROM userid WHERE status='active'")
     active_users = cursor.fetchone()[0]
 
-    # Nofaol foydalanuvchilar
+    # Nofaol
     cursor.execute("SELECT COUNT(*) FROM userid WHERE status='inactive'")
     inactive_users = cursor.fetchone()[0]
 
-    # Sana bo‘yicha
+    # Sanalar
     today = dt.now().date()
     week_ago = today - timedelta(days=7)
     month_start = today.replace(day=1)
 
+    # String formatga o‘giramiz
+    today_str = today.strftime("%Y-%m-%d")
+    week_str = week_ago.strftime("%Y-%m-%d")
+    month_str = month_start.strftime("%Y-%m-%d")
+
     # Bugun qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)=?", (today,))
+    cursor.execute("""
+        SELECT COUNT(*) FROM userid_today
+        WHERE registration_date = ?
+    """, (today_str,))
     today_users = cursor.fetchone()[0]
 
-    # Haftada qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)>=?", (week_ago,))
+    # 7 kunda qo‘shilganlar
+    cursor.execute("""
+        SELECT COUNT(*) FROM userid_today
+        WHERE registration_date >= ?
+    """, (week_str,))
     week_users = cursor.fetchone()[0]
 
     # Oylik qo‘shilganlar
-    cursor.execute("SELECT COUNT(*) FROM userid_today WHERE DATE(registration_date)>=?", (month_start,))
+    cursor.execute("""
+        SELECT COUNT(*) FROM userid_today
+        WHERE registration_date >= ?
+    """, (month_str,))
     month_users = cursor.fetchone()[0]
 
     conn.close()
 
-    current_datetime = dt.now().strftime("%Y-%m-%d %H:%M")
+    now = dt.now().strftime("%Y-%m-%d %H:%M")
 
     await message.reply(
-        f"📊 <b>Statistika</b>\n\n"
-        f"⏰ Vaqt: <b>{current_datetime}</b>\n\n"
+        f"📊 <b>STATISTIKA</b>\n\n"
+        f"⏰ Vaqt: <b>{now}</b>\n\n"
         f"👥 Umumiy foydalanuvchilar: <b>{total_users}</b>\n"
-        f"✅ Faol: <b>{active_users}</b>\n"
-        f"❌ Nofaol: <b>{inactive_users}</b>\n\n"
+        f"🟢 Faol: <b>{active_users}</b>\n"
+        f"🔴 Nofaol: <b>{inactive_users}</b>\n\n"
         f"📅 Bugun qo‘shilgan: <b>{today_users}</b>\n"
-        f"🗓 Haftada qo‘shilgan: <b>{week_users}</b>\n"
+        f"🗓 7 kunda qo‘shilgan: <b>{week_users}</b>\n"
         f"📆 Oylik qo‘shilgan: <b>{month_users}</b>\n",
         parse_mode="HTML"
     )
 
     await state.finish()
+
 
 
 
@@ -1683,12 +1748,24 @@ async def process_delete_zayaf(message: types.Message, state: FSMContext):
     
     await state.finish()
 
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        
+        [KeyboardButton("💎Premium")],   # << Doimiy pastda turadigan tugma
+        
+    ],
+    resize_keyboard=True
+)
 @dp.message_handler(commands=["start"], state="*")
 async def start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user_name_full = message.from_user.full_name
     movie_name = None
+    
+    from datetime import datetime as dt
+    today = dt.now().strftime("%Y-%m-%d")  # STATISTIKA UCHUN
 
     with sqlite3.connect('kinosaroy1bot.db') as conn:
         cursor = conn.cursor()
@@ -1703,22 +1780,29 @@ async def start(message: types.Message, state: FSMContext):
             added_time = datetime.strptime(premium_data[0], "%Y-%m-%d %H:%M")
             now = datetime.now()
 
-            # 1 oylik obuna muddati tekshiriladi
             if now - added_time < timedelta(days=30):
                 is_premium = True
             else:
-                # Muddati o'tgan bo‘lsa bazadan o‘chirib tashlanadi
                 cursor.execute("DELETE FROM premium_users WHERE user_id = ?", (user_id,))
                 conn.commit()
 
         # 🔹 Foydalanuvchini bazaga qo‘shish
         cursor.execute("SELECT COUNT(*) FROM userid WHERE user_id = ?", (user_id,))
         user_exists = cursor.fetchone()[0]
+
         if user_exists == 0:
-            cursor.execute("INSERT INTO userid (user_id) VALUES (?)", (user_id,))
+            # Asosiy jadvalga qo‘shamiz
+            cursor.execute("INSERT INTO userid (user_id, status) VALUES (?, ?)", (user_id, "active"))
             conn.commit()
 
-            # Yangi foydalanuvchi haqida kanalga xabar
+            # 🔥 STATISTIKA UCHUN — bugungi jadvalga yozish
+            cursor.execute(
+                "INSERT INTO userid_today (user_id_tod, registration_date) VALUES (?, ?)",
+                (user_id, today)
+            )
+            conn.commit()
+
+            # 🔔 Admin kanalga xabar
             cursor.execute("SELECT COUNT(*) FROM userid")
             user_count = cursor.fetchone()[0]
             channel_id = '-1002107713154'
@@ -1732,6 +1816,9 @@ async def start(message: types.Message, state: FSMContext):
                 await bot.send_message(channel_id, message_text, parse_mode="HTML")
             except:
                 pass
+
+    
+
 
         # Agar foydalanuvchi kino kodi bilan kirgan bo‘lsa
         if " " in message.text:
@@ -1786,6 +1873,7 @@ async def start(message: types.Message, state: FSMContext):
 
     # 🔹 Obunadan o‘tgan yoki premium foydalanuvchi uchun davom etamiz
     if movie_name and movie_data:
+      
         name, description, video_file_id, movie_code, download_count = movie_data
         new_download_count = download_count + 1
 
@@ -1821,13 +1909,61 @@ async def start(message: types.Message, state: FSMContext):
     else:
         await bot.send_message(
             chat_id=message.chat.id,
-            text=f"Assaloomu alaykum, Kino kodini jo'nating! ✍️",
-            parse_mode="MARKDOWN"
+            text="Assalomu alaykum, Botimizga xush kelibsiz!\n\nKino kodini jo'nating! ✍️",
+            parse_mode="MARKDOWN",
+            reply_markup=main_menu   # <<<< MUHIM QATOR — TUGMA SHU YERDA QO‘SHILADI
         )
         await state.set_state("name_qidir")
 
 
+# ------------------ Premium tugmasi bosilganda ------------------
+@dp.message_handler(lambda msg: msg.text == "💎Premium" or msg.text == "/premium")
+async def premium_menu(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
 
+    with sqlite3.connect("kinosaroy1bot.db") as conn:
+        cursor = conn.cursor()
+        # Tekshiradi: user premiumga ega yoki yo'q
+        cursor.execute("SELECT added_time FROM premium_users WHERE user_id = ?", (user_id,))
+        data = cursor.fetchone()
+
+        now = datetime.now()
+
+        if data:
+            added_time = datetime.strptime(data[0], "%Y-%m-%d %H:%M")
+            end_time = added_time + timedelta(days=30)
+
+            if now < end_time:
+                # Premium faolligi hali tugamagan
+                text = (
+                    f"💎 Sizning Premium obunangiz faol ✅\n\n"
+                    f"👤 Foydalanuvchi: {message.from_user.full_name}\n"
+                    f"🕐 Boshlangan: {added_time.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"⏰ Tugash: {end_time.strftime('%Y-%m-%d %H:%M')}\n\n"
+                    f"Reklamasiz va yuqori sifatli videolardan foydalanishingiz mumkin!"
+                )
+                await message.answer(text, reply_markup=main_menu)
+                return
+
+        # Agar premium yo‘q bo‘lsa — info + sotib olish tugmasi
+        text = (
+            "🎟 <b>AR7 MOVIE Premium</b>\n\n"
+            "💎 Premium obuna sizga quyidagi imkoniyatlarni beradi:\n"
+            "• 📺 Kanallarga obunasiz kinolarni ko‘rish\n"
+            "• 🎞 Yuqori sifatli kinolarni ko‘rish\n"
+            "• 🚫 Reklamalarsiz foydalanish\n"
+            "• ⚡ Tezroq video yuklanish\n"
+            "• 🕐 Obuna muddati: <b>1 oy</b>\n\n"
+            "💰 Narxi: <b>12 000 so‘m</b>\n\n"
+            "💳 Sotib olish uchun quyidagi tugmani bosing 👇"
+        )
+
+        buy_button = InlineKeyboardMarkup(row_width=2).add(
+            InlineKeyboardButton("💳 Sotib olish", callback_data="buy_premium"),
+            InlineKeyboardButton("⬅️ Orqaga", url="https://t.me/kinosaroyibot?start=True")
+        )
+
+        await message.answer(text, parse_mode="HTML", reply_markup=buy_button)
 # ---------- PREMIUM-------------#
 
 @dp.callback_query_handler(lambda c: c.data == "premium_info",state="*")
