@@ -1742,7 +1742,7 @@ async def start(message: types.Message, state: FSMContext):
     main_menu = ReplyKeyboardMarkup(
     keyboard=[
         
-        [KeyboardButton("💎Premium")],   # << Doimiy pastda turadigan tugma
+        [KeyboardButton("💎Premium")]   # << Doimiy pastda turadigan tugma
         
     ],
     resize_keyboard=True
