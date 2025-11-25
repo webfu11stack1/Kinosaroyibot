@@ -1739,14 +1739,14 @@ async def process_delete_zayaf(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=["start"], state="*")
 async def start(message: types.Message, state: FSMContext):
-    main_menu = ReplyKeyboardMarkup(
-    keyboard=[
-        
-        [KeyboardButton("💎Premium")]   # << Doimiy pastda turadigan tugma
-        
-    ],
-    resize_keyboard=True
-)
+    markup = InlineKeyboardMarkup()
+
+    premium_btn = InlineKeyboardButton(
+        text="💎Premium ",
+        callback_data="premium_menu"
+    )
+
+    markup.add(premium_btn)
     user_id = message.from_user.id
     user_name_full = message.from_user.full_name
     movie_name = None
@@ -1898,13 +1898,14 @@ async def start(message: types.Message, state: FSMContext):
             chat_id=message.chat.id,
             text="Assalomu alaykum, Botimizga xush kelibsiz!\n\nKino kodini jo'nating! ✍️",
             parse_mode="MARKDOWN",
-            reply_markup=main_menu   # <<<< MUHIM QATOR — TUGMA SHU YERDA QO‘SHILADI
+            reply_markup=markup
+             
         )
         await state.set_state("name_qidir")
 
 
 # ------------------ Premium tugmasi bosilganda ------------------
-@dp.message_handler(lambda msg: msg.text == "💎Premium" or msg.text == "/premium")
+@dp.message_handler(commands=["premium"],state="*")
 async def premium_menu(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
 
@@ -1929,7 +1930,7 @@ async def premium_menu(message: types.Message, state: FSMContext):
                     f"⏰ Tugash: {end_time.strftime('%Y-%m-%d %H:%M')}\n\n"
                     f"Reklamasiz va yuqori sifatli videolardan foydalanishingiz mumkin!"
                 )
-                await message.answer(text, reply_markup=main_menu)
+                await message.answer(text)
                 return
 
         # Agar premium yo‘q bo‘lsa — info + sotib olish tugmasi
